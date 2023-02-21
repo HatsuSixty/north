@@ -12,4 +12,4 @@ If you want to run the file after successful compilation, run the following comm
 ```console
 $ ./north.py com -r <file>
 ```
-For more details, see `./north.py help`
+For more details, see `./north.py help`.
