@@ -260,6 +260,9 @@ def compiler_error_macro_redefinition(token: Token, loc: TokenLoc):
     compiler_error_base(token, f"redefinition of macro `{token.value}`")
     print("%s:%d:%d: NOTE: original definition located here" % loc, file=stderr)
 
+def compiler_error_intrinsic_redefinition(token: Token):
+    compiler_error_base(token, "redefinition of built-in intrinsic")
+
 def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
     c += 1
     if char == '\n':
@@ -396,6 +399,9 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     macro_tokens.append(ntoken)
                 if macro_name in macros:
                     compiler_error_macro_redefinition(macro_name_token, macros[macro_name].loc)
+                    exit(1)
+                if macro_name in INTRINSICS_TABLE:
+                    compiler_error_intrinsic_redefinition(macro_name_token)
                     exit(1)
                 macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
             elif token.value == Keyword.END:
