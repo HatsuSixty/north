@@ -369,7 +369,6 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.DO, operand=while_ip))
             elif token.value == Keyword.MACRO:
-                # TODO: Allow blocks inside macros
                 if len(rtokens) < 1:
                     compiler_error_macro_unfinished(token)
                     exit(1)
@@ -379,18 +378,25 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     exit(1)
                 macro_loc = token.loc
                 macro_name = macro_name_token.value
-                if macro_name in macros:
-                    compiler_error_macro_redefinition(macro_name_token, macros[macro_name].loc)
-                    exit(1)
                 macro_tokens: List[Token] = []
+                nesting_depth: int = 0
                 while True:
                     if len(rtokens) < 1:
                         compiler_error_macro_unfinished(token)
                         exit(1)
-                    next_token = rtokens.pop()
-                    if (next_token.typ == TokenType.KEYWORD and next_token.value == Keyword.END):
+                    ntoken = rtokens.pop()
+                    if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END and nesting_depth == 0:
                         break
-                    macro_tokens.append(next_token)
+                    if ntoken.typ == TokenType.KEYWORD:
+                        assert len(Keyword) == 6, "Not all keyword types were handled while parsing macro body"
+                        if ntoken.value in [Keyword.IF, Keyword.WHILE, Keyword.MACRO]:
+                            nesting_depth += 1
+                        elif ntoken.value == Keyword.END:
+                            nesting_depth -= 1
+                    macro_tokens.append(ntoken)
+                if macro_name in macros:
+                    compiler_error_macro_redefinition(macro_name_token, macros[macro_name].loc)
+                    exit(1)
                 macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
             elif token.value == Keyword.END:
                 if len(block_stack) < 1:
