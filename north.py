@@ -199,14 +199,16 @@ class Keyword(Enum):
     ELSE=auto()
     WHILE=auto()
     DO=auto()
+    MACRO=auto()
     END=auto()
 
-assert len(Keyword) == 5, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
+assert len(Keyword) == 6, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
 NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'if': Keyword.IF,
     'else': Keyword.ELSE,
     'while': Keyword.WHILE,
     'do': Keyword.DO,
+    'macro': Keyword.MACRO,
     'end': Keyword.END,
 }
 
@@ -218,6 +220,8 @@ class Token:
     typ: TokenType
     value: TokenValue
     loc: TokenLoc
+
+# TODO: Find a way to compress that
 
 def compiler_error_base(token: Token, error: str):
     fprintf(stderr, "%s:%d:%d: ERROR: %s" % (token.loc + (error, )))
@@ -245,6 +249,16 @@ def compiler_error_do_no_while(token: Token):
 
 def compiler_error_end_no_block(token: Token):
     compiler_error_base(token, "`end` has no block to close")
+
+def compiler_error_macro_unfinished(token: Token):
+    compiler_error_base(token, "unfinished macro definition")
+
+def compiler_error_name_not_word(token: Token):
+    compiler_error_base(token, "macro name must be a word")
+
+def compiler_error_macro_redefinition(token: Token, loc: TokenLoc):
+    compiler_error_base(token, f"redefinition of macro `{token.value}`")
+    print("%s:%d:%d: NOTE: original definition located here" % loc, file=stderr)
 
 def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
     c += 1
@@ -298,8 +312,15 @@ INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'drop': Intrinsic.DROP,
 }
 
+@dataclass
+class Macro:
+    name: str
+    tokens: List[Token]
+    loc: TokenLoc
+
 def parse_tokens_into_program(tokens: List[Token]) -> Program:
     rtokens = list(reversed(tokens))
+    macros: Dict[str, Macro] = {}
     program: Program = []
     block_stack: List[Tuple[int, TokenLoc]] = []
     while len(rtokens) > 0:
@@ -310,12 +331,16 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             program.append(Op(typ=OpType.PUSH_INT, operand=token.value))
         elif token.typ == TokenType.WORD:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
-            if not token.value in INTRINSICS_TABLE:
+            if token.value in INTRINSICS_TABLE:
+                program.append(Op(typ=OpType.INTRINSIC, operand=INTRINSICS_TABLE[token.value]))
+            elif token.value in macros:
+                macro = macros[token.value]
+                rtokens += list(reversed(macro.tokens))
+            else:
                 compiler_error_unknown_word(token)
                 exit(1)
-            program.append(Op(typ=OpType.INTRINSIC, operand=INTRINSICS_TABLE[token.value]))
         elif token.typ == TokenType.KEYWORD:
-            assert len(Keyword) == 5, "Not all keyword types were handled in parse_tokens_into_program()"
+            assert len(Keyword) == 6, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.IF))
@@ -343,6 +368,30 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     exit(1)
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.DO, operand=while_ip))
+            elif token.value == Keyword.MACRO:
+                # TODO: Allow blocks inside macros
+                if len(rtokens) < 1:
+                    compiler_error_macro_unfinished(token)
+                    exit(1)
+                macro_name_token = rtokens.pop()
+                if macro_name_token.typ != TokenType.WORD:
+                    compiler_error_name_not_word(macro_name_token)
+                    exit(1)
+                macro_loc = token.loc
+                macro_name = macro_name_token.value
+                if macro_name in macros:
+                    compiler_error_macro_redefinition(macro_name_token, macros[macro_name].loc)
+                    exit(1)
+                macro_tokens: List[Token] = []
+                while True:
+                    if len(rtokens) < 1:
+                        compiler_error_macro_unfinished(token)
+                        exit(1)
+                    next_token = rtokens.pop()
+                    if (next_token.typ == TokenType.KEYWORD and next_token.value == Keyword.END):
+                        break
+                    macro_tokens.append(next_token)
+                macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
             elif token.value == Keyword.END:
                 if len(block_stack) < 1:
                     compiler_error_end_no_block(token)
