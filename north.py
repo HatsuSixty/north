@@ -223,45 +223,11 @@ class Token:
 
 # TODO: Find a way to compress that
 
-def compiler_error_base(token: Token, error: str):
-    fprintf(stderr, "%s:%d:%d: ERROR: %s" % (token.loc + (error, )))
+def compiler_error(loc: TokenLoc, error: str):
+    fprintf(stderr, "%s:%d:%d: ERROR: %s" % (loc + (error, )))
 
-def compiler_error_unknown_word(token: Token):
-    compiler_error_base(token, f"unknown word: `{token.value}`")
-
-def compiler_error_unclosed_block(loc: TokenLoc):
-    fprintf(stderr, "%s:%d:%d: ERROR: unclosed block" % loc)
-
-def compiler_error_end_cant_close(token: Token):
-    compiler_error_base(token, "`end` can only close `if`, `if-else` and `while-do` blocks")
-
-def compiler_error_else_cant_close(token: Token):
-    compiler_error_base(token, "`else` can only close `if` blocks")
-
-def compiler_error_else_no_if(token: Token):
-    compiler_error_base(token, "`else` is not preceeded by `if`")
-
-def compiler_error_do_cant_close(token: Token):
-    compiler_error_base(token, "`do` can only close `while` blocks")
-
-def compiler_error_do_no_while(token: Token):
-    compiler_error_base(token, "`do` is not preceeded by `while`")
-
-def compiler_error_end_no_block(token: Token):
-    compiler_error_base(token, "`end` has no block to close")
-
-def compiler_error_macro_unfinished(token: Token):
-    compiler_error_base(token, "unfinished macro definition")
-
-def compiler_error_name_not_word(token: Token):
-    compiler_error_base(token, "macro name must be a word")
-
-def compiler_error_macro_redefinition(token: Token, loc: TokenLoc):
-    compiler_error_base(token, f"redefinition of macro `{token.value}`")
-    print("%s:%d:%d: NOTE: original definition located here" % loc, file=stderr)
-
-def compiler_error_intrinsic_redefinition(token: Token):
-    compiler_error_base(token, "redefinition of built-in intrinsic")
+def compiler_note(loc: TokenLoc, note: str):
+    fprintf(stderr, "%s:%d:%d: NOTE: %s" % (loc + (note, )))
 
 def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
     c += 1
@@ -340,7 +306,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 macro = macros[token.value]
                 rtokens += list(reversed(macro.tokens))
             else:
-                compiler_error_unknown_word(token)
+                compiler_error(token.loc, f"unknown word: `{token.value}`")
                 exit(1)
         elif token.typ == TokenType.KEYWORD:
             assert len(Keyword) == 6, "Not all keyword types were handled in parse_tokens_into_program()"
@@ -349,11 +315,11 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 program.append(Op(typ=OpType.IF))
             elif token.value == Keyword.ELSE:
                 if len(block_stack) < 1:
-                    compiler_error_else_no_if(token)
+                    compiler_error(token.loc, "`else` is not preceeded by `if`")
                     exit(1)
                 if_ip, _ = block_stack.pop()
                 if program[if_ip].typ != OpType.IF:
-                    compiler_error_else_cant_close(token)
+                    compiler_error(token.loc, "`else` can only close `if` blocks")
                     exit(1)
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.ELSE))
@@ -363,21 +329,21 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 program.append(Op(typ=OpType.WHILE))
             elif token.value == Keyword.DO:
                 if len(block_stack) < 1:
-                    compiler_error_do_no_while(token)
+                    compiler_error(token.loc, "`do` is not preceeded by `while`")
                     exit(1)
                 while_ip, _ = block_stack.pop()
                 if program[while_ip].typ != OpType.WHILE:
-                    compiler_error_do_cant_close(token)
+                    compiler_error(token.loc, "`do` can only close `while` blocks")
                     exit(1)
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.DO, operand=while_ip))
             elif token.value == Keyword.MACRO:
                 if len(rtokens) < 1:
-                    compiler_error_macro_unfinished(token)
+                    compiler_error(token.loc, "unfinished macro definition")
                     exit(1)
                 macro_name_token = rtokens.pop()
                 if macro_name_token.typ != TokenType.WORD:
-                    compiler_error_name_not_word(macro_name_token)
+                    compiler_error(macro_name_token.loc, "expected name to be a word")
                     exit(1)
                 macro_loc = token.loc
                 macro_name = macro_name_token.value
@@ -385,7 +351,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 nesting_depth: int = 0
                 while True:
                     if len(rtokens) < 1:
-                        compiler_error_macro_unfinished(token)
+                        compiler_error(token.loc, "unfinished macro definition")
                         exit(1)
                     ntoken = rtokens.pop()
                     if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END and nesting_depth == 0:
@@ -398,15 +364,16 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                             nesting_depth -= 1
                     macro_tokens.append(ntoken)
                 if macro_name in macros:
-                    compiler_error_macro_redefinition(macro_name_token, macros[macro_name].loc)
+                    compiler_error(macro_name_token.loc, "redefinition of already existing macro")
+                    compiler_note(macros[macro_name].loc, "original definition located here")
                     exit(1)
                 if macro_name in INTRINSICS_TABLE:
-                    compiler_error_intrinsic_redefinition(macro_name_token)
+                    compiler_error(macro_name_token.loc, "redefinition of built-in intrinsic")
                     exit(1)
                 macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
             elif token.value == Keyword.END:
                 if len(block_stack) < 1:
-                    compiler_error_end_no_block(token)
+                    compiler_error(token.loc, "`end` has no block to close")
                     exit(1)
                 block_ip, _ = block_stack.pop()
                 if program[block_ip].typ in [OpType.IF, OpType.ELSE]:
@@ -416,7 +383,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     program.append(Op(typ=OpType.END, operand=program[block_ip].operand))
                     program[block_ip].operand = len(program)
                 else:
-                    compiler_error_end_cant_close(token)
+                    compiler_error(token.loc, "`end` can only close `while-do`, `if` or `if-else` blocks")
                     exit(1)
             else:
                 raise Exception('unreachable')
@@ -424,7 +391,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             raise Exception('unreachable')
     if len(block_stack) != 0:
         _, loc = block_stack.pop()
-        compiler_error_unclosed_block(loc)
+        compiler_error(loc, "unclosed block")
         exit(1)
     program.append(Op(typ=OpType.NOP))
     return program
