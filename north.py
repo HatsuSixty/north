@@ -346,6 +346,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     compiler_error(macro_name_token.loc, "expected name to be a word")
                     exit(1)
                 macro_loc = token.loc
+                assert isinstance(macro_name_token.value, str), "This could be a bug in the lexer"
                 macro_name = macro_name_token.value
                 macro_tokens: List[Token] = []
                 nesting_depth: int = 0
