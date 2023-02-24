@@ -270,8 +270,9 @@ class Keyword(Enum):
     DO=auto()
     MACRO=auto()
     END=auto()
+    INCLUDE=auto()
 
-assert len(Keyword) == 6, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
+assert len(Keyword) == 7, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
 NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'if': Keyword.IF,
     'else': Keyword.ELSE,
@@ -279,6 +280,7 @@ NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'do': Keyword.DO,
     'macro': Keyword.MACRO,
     'end': Keyword.END,
+    'include': Keyword.INCLUDE,
 }
 
 TokenValue=Union[int, str, Keyword]
@@ -401,7 +403,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
             program.append(Op(typ=OpType.PUSH_STR, operand=token.value))
         elif token.typ == TokenType.KEYWORD:
-            assert len(Keyword) == 6, "Not all keyword types were handled in parse_tokens_into_program()"
+            assert len(Keyword) == 7, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.IF))
@@ -464,6 +466,17 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     compiler_error(macro_name_token.loc, "redefinition of built-in intrinsic")
                     exit(1)
                 macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
+            elif token.value == Keyword.INCLUDE:
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "no file path provided for inclusion")
+                    exit(1)
+                path_token = rtokens.pop()
+                if path_token.typ != TokenType.STR:
+                    compiler_error(token.loc, "file path for `include` must be a string")
+                    exit(1)
+                assert isinstance(path_token.value, str), "This could be a bug in the lexer"
+                file_path = path_token.value
+                rtokens += list(reversed(lex_file(file_path)))
             elif token.value == Keyword.END:
                 if len(block_stack) < 1:
                     compiler_error(token.loc, "`end` has no block to close")
