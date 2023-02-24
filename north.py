@@ -486,7 +486,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
         _, loc = block_stack.pop()
         compiler_error(loc, "unclosed block")
         exit(1)
-    program.append(Op(typ=OpType.NOP))
+    program += [Op(typ=OpType.PUSH_INT, operand=0), Op(typ=OpType.INTRINSIC, operand=Intrinsic.EXIT)]
     return program
 
 ####### MAIN
