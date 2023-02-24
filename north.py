@@ -50,6 +50,13 @@ class Intrinsic(Enum):
     DIVMOD=auto()
     SWAP=auto()
     DROP=auto()
+    SYSCALL0=auto()
+    SYSCALL1=auto()
+    SYSCALL2=auto()
+    SYSCALL3=auto()
+    SYSCALL4=auto()
+    SYSCALL5=auto()
+    SYSCALL6=auto()
 
 OpOperand=Union[int, Intrinsic]
 
@@ -135,7 +142,7 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, "test rax, rax")
             fprintf(stream, "jz addr_%d" % op.operand)
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 10, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
+            assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
@@ -187,6 +194,55 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "push rbx")
             elif op.operand == Intrinsic.DROP:
                 fprintf(stream, "pop rax")
+            elif op.operand == Intrinsic.SYSCALL0:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL1:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL2:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "pop rsi")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL3:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "pop rsi")
+                fprintf(stream, "pop rdx")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL4:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "pop rsi")
+                fprintf(stream, "pop rdx")
+                fprintf(stream, "pop r10")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL5:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "pop rsi")
+                fprintf(stream, "pop rdx")
+                fprintf(stream, "pop r10")
+                fprintf(stream, "pop r8")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.SYSCALL6:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rdi")
+                fprintf(stream, "pop rsi")
+                fprintf(stream, "pop rdx")
+                fprintf(stream, "pop r10")
+                fprintf(stream, "pop r8")
+                fprintf(stream, "pop r9")
+                fprintf(stream, "syscall")
+                fprintf(stream, "push rax")
             else:
                 raise Exception('Unreachable')
         elif op.typ == OpType.NOP:
@@ -293,7 +349,7 @@ def lex_file(file: str) -> List[Token]:
 
 ####### PARSER
 
-assert len(Intrinsic) == 10, "Not all intrinsics were handled in INTRINSICS_TABLE"
+assert len(Intrinsic) == 17, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'print': Intrinsic.PRINT,
     '+': Intrinsic.PLUS,
@@ -305,6 +361,13 @@ INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'dup': Intrinsic.DUP,
     'swap': Intrinsic.SWAP,
     'drop': Intrinsic.DROP,
+    'syscall0': Intrinsic.SYSCALL0,
+    'syscall1': Intrinsic.SYSCALL1,
+    'syscall2': Intrinsic.SYSCALL2,
+    'syscall3': Intrinsic.SYSCALL3,
+    'syscall4': Intrinsic.SYSCALL4,
+    'syscall5': Intrinsic.SYSCALL5,
+    'syscall6': Intrinsic.SYSCALL6,
 }
 
 @dataclass
