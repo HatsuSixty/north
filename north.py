@@ -3,8 +3,8 @@
 from copy import copy
 from dataclasses import dataclass
 from enum import Enum, auto
-from os import getcwd
-from os.path import splitext
+from os import getcwd, getenv
+from os.path import splitext, isfile
 from typing import *
 from shlex import join
 from subprocess import call
@@ -351,6 +351,9 @@ def lex_file(file: str) -> List[Token]:
 
 ####### PARSER
 
+HOME = getenv("HOME")
+INCLUDE_SEARCH_PATHS: List[str] = ["./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
+
 assert len(Intrinsic) == 17, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'print': Intrinsic.PRINT,
@@ -476,7 +479,13 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     exit(1)
                 assert isinstance(path_token.value, str), "This could be a bug in the lexer"
                 file_path = path_token.value
-                rtokens += list(reversed(lex_file(file_path)))
+                include_path = file_path
+                for p in INCLUDE_SEARCH_PATHS:
+                    path = p + file_path
+                    if isfile(path):
+                        include_path = path
+                        break
+                rtokens += list(reversed(lex_file(include_path)))
             elif token.value == Keyword.END:
                 if len(block_stack) < 1:
                     compiler_error(token.loc, "`end` has no block to close")
