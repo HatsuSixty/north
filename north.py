@@ -30,6 +30,7 @@ def run_cmd_with_log(cmd: List[str]):
 
 class OpType(Enum):
     PUSH_INT=auto()
+    PUSH_STR=auto()
     INTRINSIC=auto()
     IF=auto()
     ELSE=auto()
@@ -60,7 +61,7 @@ class Op:
 Program=List[Op]
 
 def generate_nasm_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 8, "Not all operation types were handled in generate_nasm_linux_x86_64()"
+    assert len(OpType) == 9, "Not all operation types were handled in generate_nasm_linux_x86_64()"
     fprintf(stream, "BITS 64")
     fprintf(stream, "segment .text")
     fprintf(stream, "print:")
@@ -98,6 +99,7 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
     fprintf(stream, "    ret")
     fprintf(stream, "global _start")
     fprintf(stream, "_start:")
+    strs: List[str] = []
     for ip, op in enumerate(program):
         comment = str(op.typ)
         if op.typ == OpType.INTRINSIC:
@@ -108,6 +110,11 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
             assert isinstance(op.operand, int), "This could be a bug in the parser"
             fprintf(stream, "mov rax, %d" % op.operand)
             fprintf(stream, "push rax")
+        elif op.typ == OpType.PUSH_STR:
+            assert isinstance(op.operand, str), "This could be a bug in the parser"
+            fprintf(stream, f"push {len(op.operand)}")
+            fprintf(stream, f"push str_{len(strs)}")
+            strs.append(op.operand)
         elif op.typ == OpType.IF:
             assert isinstance(op.operand, int), "This could be a bug in the parser"
             fprintf(stream, "pop rax")
@@ -186,6 +193,11 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
             pass
         else:
             raise Exception('Unreachable')
+    for i, s in enumerate(strs):
+        stream.write(f"str_{i}: db ")
+        for c in s:
+            stream.write(f"{hex(ord(c))},")
+        stream.write("0x00\n")
 
 ####### LEXER
 
@@ -193,6 +205,7 @@ class TokenType(Enum):
     INT=auto()
     WORD=auto()
     KEYWORD=auto()
+    STR=auto()
 
 class Keyword(Enum):
     IF=auto()
@@ -255,6 +268,19 @@ def lex_string(string: str, file_loc_name: str) -> List[Token]:
                         t = Token(TokenType.WORD, word, loc)
                 tokens.append(t)
             word = ""
+        elif string[char] == '"':
+            loc = (file_loc_name, r+1, c+1)
+            r, c = advance_loc(string[char], r, c)
+            char += 1
+            lit = ""
+            while string[char] != '"':
+                lit += string[char]
+                r, c = advance_loc(string[char], r, c)
+                char += 1
+                if char >= len(string):
+                    compiler_error(loc, "unclosed string")
+                    exit(1)
+            tokens.append(Token(TokenType.STR, bytes(lit, 'utf-8').decode('unicode_escape'), loc))
         else:
             word += string[char]
         r, c = advance_loc(string[char], r, c)
@@ -294,7 +320,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
     block_stack: List[Tuple[int, TokenLoc]] = []
     while len(rtokens) > 0:
         token = rtokens.pop()
-        assert len(TokenType) == 3, "Not all token types were handled in parse_tokens_into_program()"
+        assert len(TokenType) == 4, "Not all token types were handled in parse_tokens_into_program()"
         if token.typ == TokenType.INT:
             assert isinstance(token.value, int), "This could be a bug in the lexer"
             program.append(Op(typ=OpType.PUSH_INT, operand=token.value))
@@ -308,6 +334,9 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             else:
                 compiler_error(token.loc, f"unknown word: `{token.value}`")
                 exit(1)
+        elif token.typ == TokenType.STR:
+            assert isinstance(token.value, str), "This could be a bug in the lexer"
+            program.append(Op(typ=OpType.PUSH_STR, operand=token.value))
         elif token.typ == TokenType.KEYWORD:
             assert len(Keyword) == 6, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
