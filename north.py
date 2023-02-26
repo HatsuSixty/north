@@ -260,6 +260,7 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
     fprintf(stream, "#include <stdio.h>")
     fprintf(stream, "#include <stdint.h>")
     fprintf(stream, "#include <stdlib.h>")
+    fprintf(stream, "#include <unistd.h>")
     fprintf(stream, "")
     fprintf(stream, "#define STACK_CAPACITY 640000")
     fprintf(stream, "static int64_t stack[STACK_CAPACITY] = {0};")
@@ -338,19 +339,61 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             elif op.operand == Intrinsic.DROP:
                 fprintf(stream, "    pop();")
             elif op.operand == Intrinsic.SYSCALL0:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        syscall(sys);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL1:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        syscall(sys, a);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL2:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        syscall(sys, a, b);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL3:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        int c = pop();")
+                fprintf(stream, "        syscall(sys, a, b, c);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL4:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        int c = pop();")
+                fprintf(stream, "        int d = pop();")
+                fprintf(stream, "        syscall(sys, a, b, c, d);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL5:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        int c = pop();")
+                fprintf(stream, "        int d = pop();")
+                fprintf(stream, "        int e = pop();")
+                fprintf(stream, "        syscall(sys, a, b, c, d, e);")
+                fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL6:
-                raise NotImplementedError
+                fprintf(stream, "    {")
+                fprintf(stream, "        int sys = pop();")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        int c = pop();")
+                fprintf(stream, "        int d = pop();")
+                fprintf(stream, "        int e = pop();")
+                fprintf(stream, "        int f = pop();")
+                fprintf(stream, "        syscall(sys, a, b, c, d, e, f);")
+                fprintf(stream, "    }")
         elif op.typ == OpType.IF:
             raise NotImplementedError
         elif op.typ == OpType.ELSE:
