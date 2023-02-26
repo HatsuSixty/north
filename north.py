@@ -58,7 +58,7 @@ class Intrinsic(Enum):
     SYSCALL5=auto()
     SYSCALL6=auto()
 
-OpOperand=Union[int, Intrinsic]
+OpOperand=Union[int, Intrinsic, str]
 
 @dataclass
 class Op:
@@ -254,6 +254,116 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
         for c in s:
             stream.write(f"{hex(ord(c))},")
         stream.write("0x00\n")
+
+def generate_c_linux_x86_64(program: Program, stream: IO):
+    assert len(OpType) == 9, "Not all operation types were handled in generate_c_linux_x86_64()"
+    fprintf(stream, "#include <stdio.h>")
+    fprintf(stream, "#include <stdint.h>")
+    fprintf(stream, "#include <stdlib.h>")
+    fprintf(stream, "")
+    fprintf(stream, "#define STACK_CAPACITY 640000")
+    fprintf(stream, "static int64_t stack[STACK_CAPACITY] = {0};")
+    fprintf(stream, "size_t stack_count = 0;")
+    fprintf(stream, "")
+    fprintf(stream, "void push(int64_t value) {")
+    fprintf(stream, "    stack[stack_count++] = value;")
+    fprintf(stream, "}")
+    fprintf(stream, "")
+    fprintf(stream, "int64_t pop() {")
+    fprintf(stream, "    return stack[--stack_count];")
+    fprintf(stream, "}")
+    fprintf(stream, "")
+    fprintf(stream, "int main(int argc, const int64_t** argv) {")
+    fprintf(stream, "    (void) argc;")
+    fprintf(stream, "    (void) argv;")
+    for ip, op in enumerate(program):
+        comment = str(op.typ)
+        if op.typ == OpType.INTRINSIC:
+            comment += f" {str(op.operand)}"
+        fprintf(stream, f"    // -- {comment} --")
+        if op.typ == OpType.PUSH_INT:
+            fprintf(stream, f"    push({op.operand});")
+        elif op.typ == OpType.PUSH_STR:
+            raise NotImplementedError
+        elif op.typ == OpType.INTRINSIC:
+            assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_c_linux_x86_64()"
+            if op.operand == Intrinsic.PLUS:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(a + b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.MINUS:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(b - a);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.EQUAL:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(a == b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.NEQUAL:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(a != b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.PRINT:
+                fprintf(stream, "    printf(\"%ld\\n\", pop());")
+            elif op.operand == Intrinsic.EXIT:
+                fprintf(stream, "    exit(pop());")
+            elif op.operand == Intrinsic.DUP:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        push(a);")
+                fprintf(stream, "        push(a);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.DIVMOD:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(a / b);")
+                fprintf(stream, "        push(a % b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.SWAP:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int a = pop();")
+                fprintf(stream, "        int b = pop();")
+                fprintf(stream, "        push(a);")
+                fprintf(stream, "        push(b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.DROP:
+                fprintf(stream, "    pop();")
+            elif op.operand == Intrinsic.SYSCALL0:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL1:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL2:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL3:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL4:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL5:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.SYSCALL6:
+                raise NotImplementedError
+        elif op.typ == OpType.IF:
+            raise NotImplementedError
+        elif op.typ == OpType.ELSE:
+            raise NotImplementedError
+        elif op.typ == OpType.WHILE:
+            raise NotImplementedError
+        elif op.typ == OpType.DO:
+            raise NotImplementedError
+        elif op.typ == OpType.END:
+            raise NotImplementedError
+        elif op.typ == OpType.NOP:
+            pass
+    fprintf(stream, "}")
 
 ####### LEXER
 
@@ -519,8 +629,12 @@ def usage(stream: IO, myname: str):
     fprintf(stream, "    help                   Prints this help and exits with 0 exit code")
     fprintf(stream, "    com [OPTIONS] <file>   Compile <file>")
     fprintf(stream, "      OPTIONS:")
-    fprintf(stream, "        -r          Run the compiled executable after successful compilation")
-    fprintf(stream, "        -o <file>   Change the output executable name to <file>")
+    fprintf(stream, "        -r                 Run the compiled executable after successful compilation")
+    fprintf(stream, "        -o <file>          Change the output executable name to <file>")
+    fprintf(stream, "        -target <target>   Change the compilation target to target")
+    fprintf(stream, "        TARGETS:")
+    fprintf(stream, "          c      Generates C code and then compiles with GCC")
+    fprintf(stream, "          nasm   Generates assembly code and then compiles with nasm")
 
 if __name__ == '__main__':
     args = copy(argv)
@@ -540,45 +654,71 @@ if __name__ == '__main__':
 
         filename = ""
         outputfilename = ""
-        next_arg = args.pop(0)
         run = False
-        if next_arg.startswith('-'):
-            while next_arg[0] == '-': next_arg = next_arg[1:]
-            if next_arg == "r":
-                run = True
-            elif next_arg == "o":
-                if len(args) < 1:
-                    compiler_error_info("no output file name was provided")
+        target = "nasm"
+
+        next_arg = args.pop(0)
+        if not next_arg.startswith('-'):
+            filename = next_arg
+        else:
+            while True:
+                while next_arg[0] == '-': next_arg = next_arg[1:]
+                if next_arg == "o":
+                    if len(args) < 1:
+                        compiler_error_info("no output file was provided")
+                        usage(stderr, myname)
+                        exit(1)
+                    outputfilename = args.pop(0)
+                elif next_arg == "r":
+                    run = True
+                elif next_arg == "target":
+                    if len(args) < 1:
+                        compiler_error_info("no compilation target was provided")
+                        usage(stderr, myname)
+                        exit(1)
+                    target = args.pop(0)
+                else:
+                    compiler_error_info(f"unknown flag: `{next_arg}`")
                     usage(stderr, myname)
                     exit(1)
-                outputfilename = args.pop(0)
-            else:
-                compiler_error_info(f"unknown flag: `{next_arg}`")
-                usage(stderr, myname)
-                exit(1)
-
-            if len(args) < 1:
-                compiler_error_info("no input file was provided")
-                usage(stderr, myname)
-                exit(1)
-            filename = args.pop(0)
-        else:
+                if len(args) < 1:
+                    compiler_error_info("no input file was provided")
+                    usage(stderr, myname)
+                    exit(1)
+                next_arg = args.pop(0)
+                if not next_arg.startswith('-'):
+                    break
             filename = next_arg
 
         basefilename = splitext(filename)[0]
         if outputfilename != "":
             basefilename = outputfilename
-        output = f"{basefilename}.asm"
-        o_filename = f"{basefilename}.o"
-
         program = parse_tokens_into_program(lex_file(filename))
-        file = open(output, "w")
-        compiler_info("info", f"Generating `{output}`")
-        generate_nasm_linux_x86_64(program, file)
-        file.close()
+        if target == "nasm":
+            output = f"{basefilename}.asm"
+            o_filename = f"{basefilename}.o"
 
-        run_cmd_with_log(["nasm", "-felf64", output])
-        run_cmd_with_log(["ld", "-o", basefilename, o_filename])
+            file = open(output, "w")
+            compiler_info("info", f"Generating `{output}`")
+            generate_nasm_linux_x86_64(program, file)
+            file.close()
+
+            run_cmd_with_log(["nasm", "-felf64", output])
+            run_cmd_with_log(["ld", "-o", basefilename, o_filename])
+        elif target == "c":
+            output = f"{basefilename}.c"
+
+            file = open(output, "w")
+            compiler_info("info", f"Generating `{output}`")
+            generate_c_linux_x86_64(program, file)
+            file.close()
+
+            run_cmd_with_log(["gcc", "-o", basefilename, output])
+        else:
+            compiler_error_info(f"unknown compilation target: `{target}`")
+            usage(stderr, myname)
+            exit(1)
+
         if run:
             run_cmd_with_log([f"./{basefilename}"])
     elif subcommand == "help":
