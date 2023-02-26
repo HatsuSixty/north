@@ -292,7 +292,11 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
         if op.typ == OpType.PUSH_INT:
             fprintf(stream, f"    push({op.operand});")
         elif op.typ == OpType.PUSH_STR:
-            raise NotImplementedError
+            fprintf(stream, f"    push({len(op.operand)});")
+            stream.write("    push((int64_t) ")
+            for c in op.operand:
+                stream.write("\"\\x%x\"" % ord(c))
+            stream.write(");\n")
         elif op.typ == OpType.INTRINSIC:
             assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
