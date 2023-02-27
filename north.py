@@ -79,7 +79,7 @@ def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
     return (r, c)
 
 def lex_string(string: str, file_loc_name: str) -> List[Token]:
-    string += ' '
+    string += ' \n'
     tokens: List[Token] = []
     char = 0
     c = 0
@@ -110,6 +110,10 @@ def lex_string(string: str, file_loc_name: str) -> List[Token]:
                     compiler_error(loc, "unclosed string")
                     exit(1)
             tokens.append(Token(TokenType.STR, bytes(lit, 'utf-8').decode('unicode_escape'), loc))
+        elif string[char] == ';':
+            while string[char] != '\n':
+                r, c = advance_loc(string[char], r, c)
+                char += 1
         else:
             word += string[char]
         r, c = advance_loc(string[char], r, c)
