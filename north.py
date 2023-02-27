@@ -535,7 +535,11 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
         elif op.typ == OpType.CALL1:
             raise NotImplementedError
         elif op.typ == OpType.CALL2:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, f"        push({op.operand}(a, b));")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CALL3:
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
