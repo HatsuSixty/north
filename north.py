@@ -37,7 +37,6 @@ class OpType(Enum):
     WHILE=auto()
     DO=auto()
     END=auto()
-    NOP=auto()
 
 class Intrinsic(Enum):
     PLUS=auto()
@@ -68,7 +67,7 @@ class Op:
 Program=List[Op]
 
 def generate_nasm_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 9, "Not all operation types were handled in generate_nasm_linux_x86_64()"
+    assert len(OpType) == 8, "Not all operation types were handled in generate_nasm_linux_x86_64()"
     fprintf(stream, "BITS 64")
     fprintf(stream, "segment .text")
     fprintf(stream, "print:")
@@ -245,8 +244,6 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "push rax")
             else:
                 raise Exception('Unreachable')
-        elif op.typ == OpType.NOP:
-            pass
         else:
             raise Exception('Unreachable')
     for i, s in enumerate(strs):
@@ -256,7 +253,7 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
         stream.write("0x00\n")
 
 def generate_c_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 9, "Not all operation types were handled in generate_c_linux_x86_64()"
+    assert len(OpType) == 8, "Not all operation types were handled in generate_c_linux_x86_64()"
     fprintf(stream, "#if !(defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER))")
     fprintf(stream, "#  error \"This code is only compilable by GCC\"")
     fprintf(stream, "#endif")
@@ -420,8 +417,6 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, "    while (condition_%d()) {" % while_stack.pop())
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
-        elif op.typ == OpType.NOP:
-            pass
     fprintf(stream, "}")
 
 ####### LEXER
