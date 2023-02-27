@@ -402,6 +402,8 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "        int64_t f = pop();")
                 fprintf(stream, "        syscall(sys, a, b, c, d, e, f);")
                 fprintf(stream, "    }")
+            else:
+                raise Exception('Unreachable')
         elif op.typ == OpType.IF:
             fprintf(stream, "    if (pop()) {")
         elif op.typ == OpType.ELSE:
@@ -417,6 +419,8 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, "    while (condition_%d()) {" % while_stack.pop())
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
+        else:
+            raise Exception('Unreachable')
     fprintf(stream, "}")
 
 ####### LEXER
