@@ -1,0 +1,9 @@
+; Wrappers for Linux syscalls
+
+include "syscall.north"
+
+macro write SYS_write syscall3 end
+macro read SYS_read syscall3 end
+macro open SYS_open syscall3 end
+macro openat SYS_openat syscall4 end
+macro close SYS_close syscall1 end

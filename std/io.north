@@ -1,0 +1,12 @@
+; IO instructions used in North
+
+include "linux.north"
+
+macro stdin 0 end
+macro stdout 1 end
+macro stderr 2 end
+
+macro puts  stdout write drop end
+macro fputs        write drop end
+macro gets    stdin read drop end
+macro fgets         read drop end
