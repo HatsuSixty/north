@@ -26,6 +26,100 @@ def run_cmd_with_log(cmd: List[str]):
     compiler_info("cmd", join(cmd))
     call(cmd, cwd=getcwd())
 
+####### LEXER
+
+class TokenType(Enum):
+    INT=auto()
+    WORD=auto()
+    KEYWORD=auto()
+    STR=auto()
+
+class Keyword(Enum):
+    IF=auto()
+    ELSE=auto()
+    WHILE=auto()
+    DO=auto()
+    MACRO=auto()
+    END=auto()
+    INCLUDE=auto()
+    CALL=auto()
+
+assert len(Keyword) == 8, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
+NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
+    'if': Keyword.IF,
+    'else': Keyword.ELSE,
+    'while': Keyword.WHILE,
+    'do': Keyword.DO,
+    'macro': Keyword.MACRO,
+    'end': Keyword.END,
+    'call': Keyword.CALL,
+    'include': Keyword.INCLUDE,
+}
+
+TokenValue=Union[int, str, Keyword]
+TokenLoc=Tuple[str, int, int]
+
+@dataclass
+class Token:
+    typ: TokenType
+    value: TokenValue
+    loc: TokenLoc
+
+def compiler_error(loc: TokenLoc, error: str):
+    fprintf(stderr, "%s:%d:%d: ERROR: %s" % (loc + (error, )))
+
+def compiler_note(loc: TokenLoc, note: str):
+    fprintf(stderr, "%s:%d:%d: NOTE: %s" % (loc + (note, )))
+
+def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
+    c += 1
+    if char == '\n':
+        r += 1
+        c = 0
+    return (r, c)
+
+def lex_string(string: str, file_loc_name: str) -> List[Token]:
+    string += ' '
+    tokens: List[Token] = []
+    char = 0
+    c = 0
+    r = 0
+    word = ""
+    while char < len(string):
+        if string[char].isspace():
+            if word != '':
+                loc = (file_loc_name, r+1, c-len(word)+1)
+                try: t = Token(TokenType.INT, int(word), loc)
+                except:
+                    if word in NAME_TO_KEYWORD_TABLE:
+                        t = Token(TokenType.KEYWORD, NAME_TO_KEYWORD_TABLE[word], loc)
+                    else:
+                        t = Token(TokenType.WORD, word, loc)
+                tokens.append(t)
+            word = ""
+        elif string[char] == '"':
+            loc = (file_loc_name, r+1, c+1)
+            r, c = advance_loc(string[char], r, c)
+            char += 1
+            lit = ""
+            while string[char] != '"':
+                lit += string[char]
+                r, c = advance_loc(string[char], r, c)
+                char += 1
+                if char >= len(string):
+                    compiler_error(loc, "unclosed string")
+                    exit(1)
+            tokens.append(Token(TokenType.STR, bytes(lit, 'utf-8').decode('unicode_escape'), loc))
+        else:
+            word += string[char]
+        r, c = advance_loc(string[char], r, c)
+        char += 1
+    return tokens
+
+def lex_file(file: str) -> List[Token]:
+    with open(file, "r") as f:
+        return lex_string(f.read(), file)
+
 ####### COMPILER
 
 class OpType(Enum):
@@ -37,6 +131,13 @@ class OpType(Enum):
     WHILE=auto()
     DO=auto()
     END=auto()
+    CALL0=auto()
+    CALL1=auto()
+    CALL2=auto()
+    CALL3=auto()
+    CALL4=auto()
+    CALL5=auto()
+    CALL6=auto()
 
 class Intrinsic(Enum):
     PLUS=auto()
@@ -62,12 +163,13 @@ OpOperand=Union[int, Intrinsic, str]
 @dataclass
 class Op:
     typ: OpType
+    loc: TokenLoc
     operand: Optional[OpOperand] = None
 
 Program=List[Op]
 
 def generate_nasm_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 8, "Not all operation types were handled in generate_nasm_linux_x86_64()"
+    assert len(OpType) == 15, "Not all operation types were handled in generate_nasm_linux_x86_64()"
     fprintf(stream, "BITS 64")
     fprintf(stream, "segment .text")
     fprintf(stream, "print:")
@@ -244,6 +346,15 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "push rax")
             else:
                 raise Exception('Unreachable')
+        elif op.typ in [OpType.CALL0,
+                        OpType.CALL1,
+                        OpType.CALL2,
+                        OpType.CALL3,
+                        OpType.CALL4,
+                        OpType.CALL5,
+                        OpType.CALL6]:
+            compiler_error(op.loc, "`call` instructions are only available in C compilation target")
+            exit(1)
         else:
             raise Exception('Unreachable')
     for i, s in enumerate(strs):
@@ -253,7 +364,7 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
         stream.write("0x00\n")
 
 def generate_c_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 8, "Not all operation types were handled in generate_c_linux_x86_64()"
+    assert len(OpType) == 15, "Not all operation types were handled in generate_c_linux_x86_64()"
     fprintf(stream, "#if !(defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER))")
     fprintf(stream, "#  error \"This code is only compilable by GCC\"")
     fprintf(stream, "#endif")
@@ -419,103 +530,28 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, "    while (condition_%d()) {" % while_stack.pop())
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
+        elif op.typ == OpType.CALL0:
+            raise NotImplementedError
+        elif op.typ == OpType.CALL1:
+            raise NotImplementedError
+        elif op.typ == OpType.CALL2:
+            raise NotImplementedError
+        elif op.typ == OpType.CALL3:
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, "        int64_t c = pop();")
+            fprintf(stream, f"        push({op.operand}(a, b, c));")
+            fprintf(stream, "    }")
+        elif op.typ == OpType.CALL4:
+            raise NotImplementedError
+        elif op.typ == OpType.CALL5:
+            raise NotImplementedError
+        elif op.typ == OpType.CALL6:
+            raise NotImplementedError
         else:
             raise Exception('Unreachable')
     fprintf(stream, "}")
-
-####### LEXER
-
-class TokenType(Enum):
-    INT=auto()
-    WORD=auto()
-    KEYWORD=auto()
-    STR=auto()
-
-class Keyword(Enum):
-    IF=auto()
-    ELSE=auto()
-    WHILE=auto()
-    DO=auto()
-    MACRO=auto()
-    END=auto()
-    INCLUDE=auto()
-
-assert len(Keyword) == 7, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
-NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
-    'if': Keyword.IF,
-    'else': Keyword.ELSE,
-    'while': Keyword.WHILE,
-    'do': Keyword.DO,
-    'macro': Keyword.MACRO,
-    'end': Keyword.END,
-    'include': Keyword.INCLUDE,
-}
-
-TokenValue=Union[int, str, Keyword]
-TokenLoc=Tuple[str, int, int]
-
-@dataclass
-class Token:
-    typ: TokenType
-    value: TokenValue
-    loc: TokenLoc
-
-# TODO: Find a way to compress that
-
-def compiler_error(loc: TokenLoc, error: str):
-    fprintf(stderr, "%s:%d:%d: ERROR: %s" % (loc + (error, )))
-
-def compiler_note(loc: TokenLoc, note: str):
-    fprintf(stderr, "%s:%d:%d: NOTE: %s" % (loc + (note, )))
-
-def advance_loc(char: str, r: int, c: int) -> Tuple[int, int]:
-    c += 1
-    if char == '\n':
-        r += 1
-        c = 0
-    return (r, c)
-
-def lex_string(string: str, file_loc_name: str) -> List[Token]:
-    string += ' '
-    tokens: List[Token] = []
-    char = 0
-    c = 0
-    r = 0
-    word = ""
-    while char < len(string):
-        if string[char].isspace():
-            if word != '':
-                loc = (file_loc_name, r+1, c-len(word)+1)
-                try: t = Token(TokenType.INT, int(word), loc)
-                except:
-                    if word in NAME_TO_KEYWORD_TABLE:
-                        t = Token(TokenType.KEYWORD, NAME_TO_KEYWORD_TABLE[word], loc)
-                    else:
-                        t = Token(TokenType.WORD, word, loc)
-                tokens.append(t)
-            word = ""
-        elif string[char] == '"':
-            loc = (file_loc_name, r+1, c+1)
-            r, c = advance_loc(string[char], r, c)
-            char += 1
-            lit = ""
-            while string[char] != '"':
-                lit += string[char]
-                r, c = advance_loc(string[char], r, c)
-                char += 1
-                if char >= len(string):
-                    compiler_error(loc, "unclosed string")
-                    exit(1)
-            tokens.append(Token(TokenType.STR, bytes(lit, 'utf-8').decode('unicode_escape'), loc))
-        else:
-            word += string[char]
-        r, c = advance_loc(string[char], r, c)
-        char += 1
-    return tokens
-
-def lex_file(file: str) -> List[Token]:
-    with open(file, "r") as f:
-        return lex_string(f.read(), file)
 
 ####### PARSER
 
@@ -559,11 +595,11 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
         assert len(TokenType) == 4, "Not all token types were handled in parse_tokens_into_program()"
         if token.typ == TokenType.INT:
             assert isinstance(token.value, int), "This could be a bug in the lexer"
-            program.append(Op(typ=OpType.PUSH_INT, operand=token.value))
+            program.append(Op(typ=OpType.PUSH_INT, operand=token.value, loc=token.loc))
         elif token.typ == TokenType.WORD:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
             if token.value in INTRINSICS_TABLE:
-                program.append(Op(typ=OpType.INTRINSIC, operand=INTRINSICS_TABLE[token.value]))
+                program.append(Op(typ=OpType.INTRINSIC, operand=INTRINSICS_TABLE[token.value], loc=token.loc))
             elif token.value in macros:
                 macro = macros[token.value]
                 rtokens += list(reversed(macro.tokens))
@@ -572,12 +608,12 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 exit(1)
         elif token.typ == TokenType.STR:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
-            program.append(Op(typ=OpType.PUSH_STR, operand=token.value))
+            program.append(Op(typ=OpType.PUSH_STR, operand=token.value, loc=token.loc))
         elif token.typ == TokenType.KEYWORD:
-            assert len(Keyword) == 7, "Not all keyword types were handled in parse_tokens_into_program()"
+            assert len(Keyword) == 8, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
                 block_stack.append((len(program), token.loc))
-                program.append(Op(typ=OpType.IF))
+                program.append(Op(typ=OpType.IF, loc=token.loc))
             elif token.value == Keyword.ELSE:
                 if len(block_stack) < 1:
                     compiler_error(token.loc, "`else` is not preceeded by `if`")
@@ -587,11 +623,11 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     compiler_error(token.loc, "`else` can only close `if` blocks")
                     exit(1)
                 block_stack.append((len(program), token.loc))
-                program.append(Op(typ=OpType.ELSE))
+                program.append(Op(typ=OpType.ELSE, loc=token.loc))
                 program[if_ip].operand = len(program)
             elif token.value == Keyword.WHILE:
                 block_stack.append((len(program), token.loc))
-                program.append(Op(typ=OpType.WHILE))
+                program.append(Op(typ=OpType.WHILE, loc=token.loc))
             elif token.value == Keyword.DO:
                 if len(block_stack) < 1:
                     compiler_error(token.loc, "`do` is not preceeded by `while`")
@@ -601,7 +637,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     compiler_error(token.loc, "`do` can only close `while` blocks")
                     exit(1)
                 block_stack.append((len(program), token.loc))
-                program.append(Op(typ=OpType.DO, operand=while_ip))
+                program.append(Op(typ=OpType.DO, operand=while_ip, loc=token.loc))
             elif token.value == Keyword.MACRO:
                 if len(rtokens) < 1:
                     compiler_error(token.loc, "unfinished macro definition")
@@ -623,7 +659,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END and nesting_depth == 0:
                         break
                     if ntoken.typ == TokenType.KEYWORD:
-                        assert len(Keyword) == 6, "Not all keyword types were handled while parsing macro body"
+                        assert len(Keyword) == 8, "Not all keyword types were handled while parsing macro body"
                         if ntoken.value in [Keyword.IF, Keyword.WHILE, Keyword.MACRO]:
                             nesting_depth += 1
                         elif ntoken.value == Keyword.END:
@@ -660,14 +696,46 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     exit(1)
                 block_ip, _ = block_stack.pop()
                 if program[block_ip].typ in [OpType.IF, OpType.ELSE]:
-                    program.append(Op(typ=OpType.END))
+                    program.append(Op(typ=OpType.END, loc=token.loc))
                     program[block_ip].operand = len(program)
                 elif program[block_ip].typ == OpType.DO:
-                    program.append(Op(typ=OpType.END, operand=program[block_ip].operand))
+                    program.append(Op(typ=OpType.END, operand=program[block_ip].operand, loc=token.loc))
                     program[block_ip].operand = len(program)
                 else:
                     compiler_error(token.loc, "`end` can only close `while-do`, `if` or `if-else` blocks")
                     exit(1)
+            elif token.value == Keyword.CALL:
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "the arguments count of the function to be called was not provided")
+                    exit(1)
+                count_token = rtokens.pop()
+                if count_token.typ != TokenType.INT:
+                    compiler_error(count_token.loc, "the arguments count of the function to be called should be an integer")
+                    exit(1)
+                assert isinstance(count_token.value, int), "This could be a bug in the lexer"
+                args_count = count_token.value
+
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "the name of the function to be called was not provided")
+                    exit(1)
+                name_token = rtokens.pop()
+                if name_token.typ != TokenType.WORD:
+                    compiler_error(name_token.loc, "the name of the function to be called should be a word")
+                    exit(1)
+                assert isinstance(name_token.value, str), "This could be a bug in the lexer"
+                func_name = name_token.value
+
+                ARGC_TO_CALL_INST: Dict[int, OpType] = {
+                    0: OpType.CALL0,
+                    1: OpType.CALL1,
+                    2: OpType.CALL2,
+                    3: OpType.CALL3,
+                    4: OpType.CALL4,
+                    5: OpType.CALL5,
+                    6: OpType.CALL6,
+                }
+
+                program.append(Op(typ=ARGC_TO_CALL_INST[args_count], operand=func_name, loc=token.loc))
             else:
                 raise Exception('unreachable')
         else:
@@ -676,7 +744,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
         _, loc = block_stack.pop()
         compiler_error(loc, "unclosed block")
         exit(1)
-    program += [Op(typ=OpType.PUSH_INT, operand=0), Op(typ=OpType.INTRINSIC, operand=Intrinsic.EXIT)]
+    program += [Op(typ=OpType.PUSH_INT, operand=0, loc=('',0,0)), Op(typ=OpType.INTRINSIC, operand=Intrinsic.EXIT, loc=('',0,0))]
     return program
 
 ####### MAIN
@@ -771,7 +839,8 @@ if __name__ == '__main__':
             generate_c_linux_x86_64(program, file)
             file.close()
 
-            run_cmd_with_log(["gcc", "-std=gnu17", "-o", basefilename, output])
+            disabled_warnings = ["-Wno-int-conversion"]
+            run_cmd_with_log(["gcc", "-std=gnu17"] + disabled_warnings + ["-o", basefilename, output])
         else:
             compiler_error_info(f"unknown compilation target: `{target}`")
             usage(stderr, myname)
