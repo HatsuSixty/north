@@ -349,20 +349,20 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             elif op.operand == Intrinsic.SYSCALL0:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        syscall(sys);")
+                fprintf(stream, "        push(syscall(sys));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL1:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t sys = pop();")
                 fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        syscall(sys, a);")
+                fprintf(stream, "        push(syscall(sys, a));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL2:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t sys = pop();")
                 fprintf(stream, "        int64_t a = pop();")
                 fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        syscall(sys, a, b);")
+                fprintf(stream, "        push(syscall(sys, a, b));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL3:
                 fprintf(stream, "    {")
@@ -370,7 +370,7 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "        int64_t a = pop();")
                 fprintf(stream, "        int64_t b = pop();")
                 fprintf(stream, "        int64_t c = pop();")
-                fprintf(stream, "        syscall(sys, a, b, c);")
+                fprintf(stream, "        push(syscall(sys, a, b, c));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL4:
                 fprintf(stream, "    {")
@@ -379,7 +379,7 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "        int64_t b = pop();")
                 fprintf(stream, "        int64_t c = pop();")
                 fprintf(stream, "        int64_t d = pop();")
-                fprintf(stream, "        syscall(sys, a, b, c, d);")
+                fprintf(stream, "        push(syscall(sys, a, b, c, d));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL5:
                 fprintf(stream, "    {")
@@ -389,7 +389,7 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "        int64_t c = pop();")
                 fprintf(stream, "        int64_t d = pop();")
                 fprintf(stream, "        int64_t e = pop();")
-                fprintf(stream, "        syscall(sys, a, b, c, d, e);")
+                fprintf(stream, "        push(syscall(sys, a, b, c, d, e));")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SYSCALL6:
                 fprintf(stream, "    {")
@@ -400,7 +400,7 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
                 fprintf(stream, "        int64_t d = pop();")
                 fprintf(stream, "        int64_t e = pop();")
                 fprintf(stream, "        int64_t f = pop();")
-                fprintf(stream, "        syscall(sys, a, b, c, d, e, f);")
+                fprintf(stream, "        push(syscall(sys, a, b, c, d, e, f));")
                 fprintf(stream, "    }")
             else:
                 raise Exception('Unreachable')
