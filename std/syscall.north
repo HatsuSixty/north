@@ -1,3 +1,5 @@
+; Syscall constants
+
 macro SYS_read 0 end
 macro SYS_write 1 end
 macro SYS_open 2 end

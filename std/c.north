@@ -1,0 +1,21 @@
+; Wrappers for C functions used in North
+
+macro printf0 call 1 printf true drop end
+macro printf1 call 2 printf true drop end
+macro printf2 call 3 printf true drop end
+macro printf3 call 4 printf true drop end
+macro printf4 call 5 printf true drop end
+macro printf6 call 6 printf true drop end
+
+macro scanf  call 2 scanf true drop end
+macro fscanf call 3 scanf true drop end
+
+macro malloc      call 1 malloc true end
+macro free         call 1 free false end
+macro memset      call 3 memset true end
+macro memcpy      call 3 memcpy true end
+
+macro strlen      call 1 strlen true end
+macro strcpy swap call 2 strcpy true end
+macro strcat swap call 2 strcat true end
+macro strcmp      call 2 strcmp true end
