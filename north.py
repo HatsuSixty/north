@@ -165,7 +165,12 @@ class Intrinsic(Enum):
     SYSCALL5=auto()
     SYSCALL6=auto()
 
-OpOperand=Union[int, Intrinsic, str]
+@dataclass
+class CallOperand:
+    func: str
+    returns: bool
+
+OpOperand=Union[int, Intrinsic, CallOperand, str]
 
 @dataclass
 class Op:
@@ -541,45 +546,77 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL0:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
-            fprintf(stream, f"        push({op.operand}());")
+            if returns:
+                fprintf(stream, f"        push({func_name}());")
+            else:
+                fprintf(stream, f"        {func_name}();")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL1:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, f"        push({op.operand}(a));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a));")
+            else:
+                fprintf(stream, f"        {func_name}(a);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL2:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
             fprintf(stream, "        int64_t b = pop();")
-            fprintf(stream, f"        push({op.operand}(a, b));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a, b));")
+            else:
+                fprintf(stream, f"        {func_name}(a, b);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL3:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
             fprintf(stream, "        int64_t b = pop();")
             fprintf(stream, "        int64_t c = pop();")
-            fprintf(stream, f"        push({op.operand}(a, b, c));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a, b, c));")
+            else:
+                fprintf(stream, f"        {func_name}(a, b, c);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL4:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
             fprintf(stream, "        int64_t b = pop();")
             fprintf(stream, "        int64_t c = pop();")
             fprintf(stream, "        int64_t d = pop();")
-            fprintf(stream, f"        push({op.operand}(a, b, c, d));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a, b, c, d));")
+            else:
+                fprintf(stream, f"        {func_name}(a, b, c, d);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL5:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
             fprintf(stream, "        int64_t b = pop();")
             fprintf(stream, "        int64_t c = pop();")
             fprintf(stream, "        int64_t d = pop();")
             fprintf(stream, "        int64_t e = pop();")
-            fprintf(stream, f"        push({op.operand}(a, b, c, d, e));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a, b, c, d, e));")
+            else:
+                fprintf(stream, f"        {func_name}(a, b, c, d, e);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL6:
+            func_name = op.operand.func
+            returns = op.operand.returns
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
             fprintf(stream, "        int64_t b = pop();")
@@ -587,7 +624,10 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, "        int64_t d = pop();")
             fprintf(stream, "        int64_t e = pop();")
             fprintf(stream, "        int64_t f = pop();")
-            fprintf(stream, f"        push({op.operand}(a, b, c, d, e, f));")
+            if returns:
+                fprintf(stream, f"        push({func_name}(a, b, c, d, e, f));")
+            else:
+                fprintf(stream, f"        {func_name}(a, b, c, d, e, f);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CVAR:
             fprintf(stream, f"    push({op.operand});")
@@ -767,6 +807,22 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 assert isinstance(name_token.value, str), "This could be a bug in the lexer"
                 func_name = name_token.value
 
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "missing return information of the function to be called")
+                    exit(1)
+                returns_token = rtokens.pop()
+                if returns_token.typ != TokenType.WORD:
+                    compiler_error(returns_token.loc, "the return information of the function to be called should be a word")
+                    exit(1)
+                assert isinstance(returns_token.value, str), "This could be a bug in the lexer"
+                returns_string = returns_token.value
+                returns: bool
+                if returns_string == "true": returns = True
+                elif returns_string == "false": returns = False
+                else:
+                    compiler_error(returns_token.loc, "the return information of the function to be called should be 'true' or 'false'")
+                    exit(1)
+
                 ARGC_TO_CALL_INST: Dict[int, OpType] = {
                     0: OpType.CALL0,
                     1: OpType.CALL1,
@@ -777,14 +833,16 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     6: OpType.CALL6,
                 }
 
-                program.append(Op(typ=ARGC_TO_CALL_INST[args_count], operand=func_name, loc=token.loc))
+                program.append(Op(typ=ARGC_TO_CALL_INST[args_count],
+                                  operand=CallOperand(func=func_name, returns=bool(returns)),
+                                  loc=token.loc))
             elif token.value == Keyword.CVAR:
                 if len(rtokens) < 1:
                     compiler_error(token.loc, "the variable name was not provided")
                     exit(1)
                 name_token = rtokens.pop()
                 if name_token.typ != TokenType.WORD:
-                    compiler_error(token.loc, "the variable name must be a word")
+                    compiler_error(name_token.loc, "the variable name must be a word")
                     exit(1)
                 assert isinstance(name_token.value, str), "This could be a bug in the lexer"
                 var_name = name_token.value
