@@ -845,6 +845,15 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
 
                 mem_size = compile_time_evaluate(mem_tokens, macros)
 
+                if mem_name in macros:
+                    compiler_error(name_token.loc, "redefinition of already existing macro")
+                    exit(1)
+                if mem_name in memories:
+                    compiler_error(name_token.loc, "redefinition of already existing memory")
+                    exit(1)
+                if mem_name in INTRINSICS_TABLE:
+                    compiler_error(name_token.loc, "redefinition of built-in intrinsic")
+                    exit(1)
                 memories[mem_name] = memories_offset
                 memories_offset += mem_size
             elif token.value == Keyword.INCLUDE:
