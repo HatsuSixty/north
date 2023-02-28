@@ -425,6 +425,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
         if op.typ == OpType.PUSH_INT:
             fprintf(stream, f"    push({op.operand});")
         elif op.typ == OpType.PUSH_STR:
+            assert isinstance(op.operand, str), "This could be a bug in the parser"
             fprintf(stream, f"    push({len(op.operand)});")
             stream.write("    push((int64_t) ")
             for c in op.operand:
@@ -558,6 +559,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL0:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -567,6 +569,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}();")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL1:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -577,6 +580,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}(a);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL2:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -588,6 +592,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}(a, b);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL3:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -600,6 +605,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}(a, b, c);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL4:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -613,6 +619,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}(a, b, c, d);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL5:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -627,6 +634,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, f"        {func_name}(a, b, c, d, e);")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL6:
+            assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
             fprintf(stream, "    {")
@@ -679,7 +687,7 @@ class Macro:
     tokens: List[Token]
     loc: TokenLoc
 
-def compile_time_evaluate(tokens: Token, macros: List[Macro]) -> int:
+def compile_time_evaluate(tokens: List[Token], macros: Dict[str, Macro]) -> int:
     stack: List[int] = []
     rtokens = list(reversed(tokens))
     while len(rtokens) > 0:
@@ -710,11 +718,12 @@ def compile_time_evaluate(tokens: Token, macros: List[Macro]) -> int:
                     exit(1)
                 a = stack.pop()
                 b = stack.pop()
-                stack.append(a / b)
+                stack.append(int(a / b))
                 stack.append(a % b)
             else:
                 if token.value in macros:
-                    rtokens += list(reversed(macros[token.value]))
+                    macro = macros[token.value]
+                    rtokens += list(reversed(macro.tokens))
                 else:
                     compiler_error(token.loc, f"unsupported word in compile time evaluation: `{token.value}`")
                     exit(1)
@@ -726,7 +735,7 @@ def compile_time_evaluate(tokens: Token, macros: List[Macro]) -> int:
         exit(1)
     return stack[0]
 
-def parse_tokens_into_program(tokens: List[Token]) -> Program:
+def parse_tokens_into_program(tokens: List[Token]) -> Tuple[int, Program]:
     rtokens = list(reversed(tokens))
     macros: Dict[str, Macro] = {}
     memories: Dict[str, int] = {}
