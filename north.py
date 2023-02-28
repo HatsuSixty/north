@@ -40,18 +40,20 @@ class Keyword(Enum):
     WHILE=auto()
     DO=auto()
     MACRO=auto()
+    MEMORY=auto()
     END=auto()
     INCLUDE=auto()
     CALL=auto()
     CVAR=auto()
 
-assert len(Keyword) == 9, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
+assert len(Keyword) == 10, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
 NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'if': Keyword.IF,
     'else': Keyword.ELSE,
     'while': Keyword.WHILE,
     'do': Keyword.DO,
     'macro': Keyword.MACRO,
+    'memory': Keyword.MEMORY,
     'end': Keyword.END,
     'call': Keyword.CALL,
     'cvar': Keyword.CVAR,
@@ -131,6 +133,7 @@ def lex_file(file: str) -> List[Token]:
 class OpType(Enum):
     PUSH_INT=auto()
     PUSH_STR=auto()
+    PUSH_MEM=auto()
     INTRINSIC=auto()
     IF=auto()
     ELSE=auto()
@@ -180,8 +183,8 @@ class Op:
 
 Program=List[Op]
 
-def generate_nasm_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 16, "Not all operation types were handled in generate_nasm_linux_x86_64()"
+def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
+    assert len(OpType) == 17, "Not all operation types were handled in generate_nasm_linux_x86_64()"
     fprintf(stream, "BITS 64")
     fprintf(stream, "segment .text")
     fprintf(stream, "print:")
@@ -230,6 +233,8 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
             assert isinstance(op.operand, int), "This could be a bug in the parser"
             fprintf(stream, "mov rax, %d" % op.operand)
             fprintf(stream, "push rax")
+        elif op.typ == OpType.PUSH_MEM:
+            fprintf(stream, f"push mem+{op.operand}")
         elif op.typ == OpType.PUSH_STR:
             assert isinstance(op.operand, str), "This could be a bug in the parser"
             fprintf(stream, f"push {len(op.operand)}")
@@ -372,14 +377,17 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
             exit(1)
         else:
             raise Exception('Unreachable')
+    fprintf(stream, "segment .bss")
+    fprintf(stream, f"mem: resb {memory_size}")
+    fprintf(stream, "segment .data")
     for i, s in enumerate(strs):
         stream.write(f"str_{i}: db ")
         for c in s:
             stream.write(f"{hex(ord(c))},")
         stream.write("0x00\n")
 
-def generate_c_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 16, "Not all operation types were handled in generate_c_linux_x86_64()"
+def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
+    assert len(OpType) == 17, "Not all operation types were handled in generate_c_linux_x86_64()"
     fprintf(stream, "#if !(defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER))")
     fprintf(stream, "#  error \"This code is only compilable by GCC\"")
     fprintf(stream, "#endif")
@@ -393,6 +401,8 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
     fprintf(stream, "#define STACK_CAPACITY 640000")
     fprintf(stream, "static int64_t stack[STACK_CAPACITY] = {0};")
     fprintf(stream, "size_t stack_count = 0;")
+    fprintf(stream, "")
+    fprintf(stream, f"static char mem[{memory_size}];")
     fprintf(stream, "")
     fprintf(stream, "void push(int64_t value) {")
     fprintf(stream, "    stack[stack_count++] = value;")
@@ -420,6 +430,8 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             for c in op.operand:
                 stream.write("\"\\x%x\"" % ord(c))
             stream.write(");\n")
+        elif op.typ == OpType.PUSH_MEM:
+            fprintf(stream, f"    push(mem+{op.operand});")
         elif op.typ == OpType.INTRINSIC:
             assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
@@ -667,9 +679,58 @@ class Macro:
     tokens: List[Token]
     loc: TokenLoc
 
+def compile_time_evaluate(tokens: Token, macros: List[Macro]) -> int:
+    stack: List[int] = []
+    rtokens = list(reversed(tokens))
+    while len(rtokens) > 0:
+        token = rtokens.pop()
+        assert len(TokenType) == 4, "Not all token types were handled in compile_time_evaluate()"
+        if token.typ == TokenType.INT:
+            assert isinstance(token.value, int), "This could be a bug in the lexer"
+            stack.append(token.value)
+        elif token.typ == TokenType.WORD:
+            assert isinstance(token.value, str), "This could be a bug in the lexer"
+            if token.value == '+':
+                if len(stack) < 2:
+                    compiler_error(token.loc, "not enough arguments for `+` intrinsic in compile time evaluation")
+                    exit(1)
+                a = stack.pop()
+                b = stack.pop()
+                stack.append(a + b)
+            elif token.value == '-':
+                if len(stack) < 2:
+                    compiler_error(token.loc, "not enough arguments for `-` intrinsic in compile time evaluation")
+                    exit(1)
+                a = stack.pop()
+                b = stack.pop()
+                stack.append(b - a)
+            elif token.value == 'divmod':
+                if len(stack) < 2:
+                    compiler_error(token.loc, "not enough arguments for `+` intrinsic in compile time evaluation")
+                    exit(1)
+                a = stack.pop()
+                b = stack.pop()
+                stack.append(a / b)
+                stack.append(a % b)
+            else:
+                if token.value in macros:
+                    rtokens += list(reversed(macros[token.value]))
+                else:
+                    compiler_error(token.loc, f"unsupported word in compile time evaluation: `{token.value}`")
+                    exit(1)
+        else:
+            compiler_error(token.loc, "unsupported token type in compile time evaluation")
+            exit(1)
+    if len(stack) != 1:
+        compiler_error(token.loc, "compile time evaluation should produce only one result")
+        exit(1)
+    return stack[0]
+
 def parse_tokens_into_program(tokens: List[Token]) -> Program:
     rtokens = list(reversed(tokens))
     macros: Dict[str, Macro] = {}
+    memories: Dict[str, int] = {}
+    memories_offset: int = 0
     program: Program = []
     block_stack: List[Tuple[int, TokenLoc]] = []
     while len(rtokens) > 0:
@@ -685,6 +746,9 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             elif token.value in macros:
                 macro = macros[token.value]
                 rtokens += list(reversed(macro.tokens))
+            elif token.value in memories:
+                memory_offset = memories[token.value]
+                program.append(Op(typ=OpType.PUSH_MEM, operand=memory_offset, loc=token.loc))
             else:
                 compiler_error(token.loc, f"unknown word: `{token.value}`")
                 exit(1)
@@ -692,7 +756,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
             program.append(Op(typ=OpType.PUSH_STR, operand=token.value, loc=token.loc))
         elif token.typ == TokenType.KEYWORD:
-            assert len(Keyword) == 9, "Not all keyword types were handled in parse_tokens_into_program()"
+            assert len(Keyword) == 10, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.IF, loc=token.loc))
@@ -751,10 +815,38 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     compiler_error(macro_name_token.loc, "redefinition of already existing macro")
                     compiler_note(macros[macro_name].loc, "original definition located here")
                     exit(1)
+                if macro_name in memories:
+                    compiler_error(macro_name_token.loc, "redefinition of already existing memory")
+                    exit(1)
                 if macro_name in INTRINSICS_TABLE:
                     compiler_error(macro_name_token.loc, "redefinition of built-in intrinsic")
                     exit(1)
                 macros[macro_name] = Macro(name=macro_name, tokens=macro_tokens, loc=macro_loc)
+            elif token.value == Keyword.MEMORY:
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "unfinished memory definition")
+                    exit(1)
+                name_token = rtokens.pop()
+                if name_token.typ != TokenType.WORD:
+                    compiler_error(name_token.loc, "memory name must be a word")
+                    exit(1)
+                assert isinstance(name_token.value, str), "This could be a bug in the lexer"
+                mem_name = name_token.value
+                mem_tokens: List[Token] = []
+
+                while True:
+                    if len(rtokens) < 1:
+                        compiler_error(token.loc, "unfinished memory definition")
+                        exit(1)
+                    ntoken = rtokens.pop()
+                    if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END:
+                        break
+                    mem_tokens.append(ntoken)
+
+                mem_size = compile_time_evaluate(mem_tokens, macros)
+
+                memories[mem_name] = memories_offset
+                memories_offset += mem_size
             elif token.value == Keyword.INCLUDE:
                 if len(rtokens) < 1:
                     compiler_error(token.loc, "no file path provided for inclusion")
@@ -856,8 +948,9 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
         _, loc = block_stack.pop()
         compiler_error(loc, "unclosed block")
         exit(1)
-    program += [Op(typ=OpType.PUSH_INT, operand=0, loc=('',0,0)), Op(typ=OpType.INTRINSIC, operand=Intrinsic.EXIT, loc=('',0,0))]
-    return program
+    program += [Op(typ=OpType.PUSH_INT, operand=0, loc=('',0,0)),
+                Op(typ=OpType.INTRINSIC, operand=Intrinsic.EXIT, loc=('',0,0))]
+    return memories_offset, program
 
 ####### MAIN
 
@@ -931,14 +1024,14 @@ if __name__ == '__main__':
         basefilename = splitext(filename)[0]
         if outputfilename != "":
             basefilename = outputfilename
-        program = parse_tokens_into_program(lex_file(filename))
+        mem_size, program = parse_tokens_into_program(lex_file(filename))
         if target == "nasm":
             output = f"{basefilename}.asm"
             o_filename = f"{basefilename}.o"
 
             file = open(output, "w")
             compiler_info("info", f"Generating `{output}`")
-            generate_nasm_linux_x86_64(program, file)
+            generate_nasm_linux_x86_64(program, mem_size, file)
             file.close()
 
             run_cmd_with_log(["nasm", "-felf64", output])
@@ -948,7 +1041,7 @@ if __name__ == '__main__':
 
             file = open(output, "w")
             compiler_info("info", f"Generating `{output}`")
-            generate_c_linux_x86_64(program, file)
+            generate_c_linux_x86_64(program, mem_size, file)
             file.close()
 
             disabled_warnings = ["-Wno-int-conversion"]
