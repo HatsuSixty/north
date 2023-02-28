@@ -43,8 +43,9 @@ class Keyword(Enum):
     END=auto()
     INCLUDE=auto()
     CALL=auto()
+    CVAR=auto()
 
-assert len(Keyword) == 8, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
+assert len(Keyword) == 9, "Not all keyword types were handled in NAME_TO_KEYWORD_TABLE"
 NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'if': Keyword.IF,
     'else': Keyword.ELSE,
@@ -53,6 +54,7 @@ NAME_TO_KEYWORD_TABLE: Dict[str, Keyword] = {
     'macro': Keyword.MACRO,
     'end': Keyword.END,
     'call': Keyword.CALL,
+    'cvar': Keyword.CVAR,
     'include': Keyword.INCLUDE,
 }
 
@@ -142,6 +144,7 @@ class OpType(Enum):
     CALL4=auto()
     CALL5=auto()
     CALL6=auto()
+    CVAR=auto()
 
 class Intrinsic(Enum):
     PLUS=auto()
@@ -173,7 +176,7 @@ class Op:
 Program=List[Op]
 
 def generate_nasm_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 15, "Not all operation types were handled in generate_nasm_linux_x86_64()"
+    assert len(OpType) == 16, "Not all operation types were handled in generate_nasm_linux_x86_64()"
     fprintf(stream, "BITS 64")
     fprintf(stream, "segment .text")
     fprintf(stream, "print:")
@@ -357,7 +360,10 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
                         OpType.CALL4,
                         OpType.CALL5,
                         OpType.CALL6]:
-            compiler_error(op.loc, "`call` instructions are only available in C compilation target")
+            compiler_error(op.loc, "`call` instruction is only available in C compilation target")
+            exit(1)
+        elif op.typ == OpType.CVAR:
+            compiler_error(op.loc, "`cvar` instruction is only available in C compilation target")
             exit(1)
         else:
             raise Exception('Unreachable')
@@ -368,7 +374,7 @@ def generate_nasm_linux_x86_64(program: Program, stream: IO):
         stream.write("0x00\n")
 
 def generate_c_linux_x86_64(program: Program, stream: IO):
-    assert len(OpType) == 15, "Not all operation types were handled in generate_c_linux_x86_64()"
+    assert len(OpType) == 16, "Not all operation types were handled in generate_c_linux_x86_64()"
     fprintf(stream, "#if !(defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER))")
     fprintf(stream, "#  error \"This code is only compilable by GCC\"")
     fprintf(stream, "#endif")
@@ -557,6 +563,8 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             raise NotImplementedError
         elif op.typ == OpType.CALL6:
             raise NotImplementedError
+        elif op.typ == OpType.CVAR:
+            fprintf(stream, f"    push({op.operand});")
         else:
             raise Exception('Unreachable')
     fprintf(stream, "}")
@@ -618,7 +626,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
             assert isinstance(token.value, str), "This could be a bug in the lexer"
             program.append(Op(typ=OpType.PUSH_STR, operand=token.value, loc=token.loc))
         elif token.typ == TokenType.KEYWORD:
-            assert len(Keyword) == 8, "Not all keyword types were handled in parse_tokens_into_program()"
+            assert len(Keyword) == 9, "Not all keyword types were handled in parse_tokens_into_program()"
             if token.value == Keyword.IF:
                 block_stack.append((len(program), token.loc))
                 program.append(Op(typ=OpType.IF, loc=token.loc))
@@ -667,7 +675,7 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                     if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END and nesting_depth == 0:
                         break
                     if ntoken.typ == TokenType.KEYWORD:
-                        assert len(Keyword) == 8, "Not all keyword types were handled while parsing macro body"
+                        assert len(Keyword) == 9, "Not all keyword types were handled while parsing macro body"
                         if ntoken.value in [Keyword.IF, Keyword.WHILE, Keyword.MACRO]:
                             nesting_depth += 1
                         elif ntoken.value == Keyword.END:
@@ -744,6 +752,18 @@ def parse_tokens_into_program(tokens: List[Token]) -> Program:
                 }
 
                 program.append(Op(typ=ARGC_TO_CALL_INST[args_count], operand=func_name, loc=token.loc))
+            elif token.value == Keyword.CVAR:
+                if len(rtokens) < 1:
+                    compiler_error(token.loc, "the variable name was not provided")
+                    exit(1)
+                name_token = rtokens.pop()
+                if name_token.typ != TokenType.WORD:
+                    compiler_error(token.loc, "the variable name must be a word")
+                    exit(1)
+                assert isinstance(name_token.value, str), "This could be a bug in the lexer"
+                var_name = name_token.value
+
+                program.append(Op(typ=OpType.CVAR, operand=var_name, loc=token.loc))
             else:
                 raise Exception('unreachable')
         else:
