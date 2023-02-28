@@ -541,9 +541,14 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
         elif op.typ == OpType.END:
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL0:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, f"        push({op.operand}());")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CALL1:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, f"        push({op.operand}(a));")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CALL2:
             fprintf(stream, "    {")
             fprintf(stream, "        int64_t a = pop();")
@@ -558,11 +563,32 @@ def generate_c_linux_x86_64(program: Program, stream: IO):
             fprintf(stream, f"        push({op.operand}(a, b, c));")
             fprintf(stream, "    }")
         elif op.typ == OpType.CALL4:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, "        int64_t c = pop();")
+            fprintf(stream, "        int64_t d = pop();")
+            fprintf(stream, f"        push({op.operand}(a, b, c, d));")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CALL5:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, "        int64_t c = pop();")
+            fprintf(stream, "        int64_t d = pop();")
+            fprintf(stream, "        int64_t e = pop();")
+            fprintf(stream, f"        push({op.operand}(a, b, c, d, e));")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CALL6:
-            raise NotImplementedError
+            fprintf(stream, "    {")
+            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, "        int64_t c = pop();")
+            fprintf(stream, "        int64_t d = pop();")
+            fprintf(stream, "        int64_t e = pop();")
+            fprintf(stream, "        int64_t f = pop();")
+            fprintf(stream, f"        push({op.operand}(a, b, c, d, e, f));")
+            fprintf(stream, "    }")
         elif op.typ == OpType.CVAR:
             fprintf(stream, f"    push({op.operand});")
         else:
