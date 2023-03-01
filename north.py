@@ -399,8 +399,8 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
             elif op.operand == Intrinsic.LT:
                 fprintf(stream, "mov rcx, 0")
                 fprintf(stream, "mov rdx, 1")
-                fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
+                fprintf(stream, "pop rax")
                 fprintf(stream, "cmp rax, rbx")
                 fprintf(stream, "cmovl rcx, rdx")
                 fprintf(stream, "push rcx")
