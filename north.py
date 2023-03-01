@@ -175,6 +175,7 @@ class Intrinsic(Enum):
     STORE16=auto()
     STORE32=auto()
     STORE64=auto()
+    LT=auto()
 
 @dataclass
 class CallOperand:
@@ -268,7 +269,7 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
             fprintf(stream, "test rax, rax")
             fprintf(stream, "jz addr_%d" % op.operand)
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 25, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
+            assert len(Intrinsic) == 26, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
@@ -395,6 +396,14 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
                 fprintf(stream, "mov [rbx], rax")
+            elif op.operand == Intrinsic.LT:
+                fprintf(stream, "mov rcx, 0")
+                fprintf(stream, "mov rdx, 1")
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "cmp rax, rbx")
+                fprintf(stream, "cmovl rcx, rdx")
+                fprintf(stream, "push rcx")
             else:
                 raise Exception('Unreachable')
         elif op.typ in [OpType.CALL0,
@@ -724,7 +733,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
 HOME = getenv("HOME")
 INCLUDE_SEARCH_PATHS: List[str] = ["./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
 
-assert len(Intrinsic) == 25, "Not all intrinsics were handled in INTRINSICS_TABLE"
+assert len(Intrinsic) == 26, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'print': Intrinsic.PRINT,
     '+': Intrinsic.PLUS,
@@ -751,6 +760,7 @@ INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     '@16': Intrinsic.LOAD16,
     '@32': Intrinsic.LOAD32,
     '@64': Intrinsic.LOAD64,
+    '<': Intrinsic.LT,
 }
 
 @dataclass
