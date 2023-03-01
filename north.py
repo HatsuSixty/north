@@ -902,8 +902,8 @@ def parse_tokens_into_program(tokens: List[Token]) -> Tuple[int, Program]:
                     if ntoken.typ == TokenType.KEYWORD and ntoken.value == Keyword.END and nesting_depth == 0:
                         break
                     if ntoken.typ == TokenType.KEYWORD:
-                        assert len(Keyword) == 9, "Not all keyword types were handled while parsing macro body"
-                        if ntoken.value in [Keyword.IF, Keyword.WHILE, Keyword.MACRO]:
+                        assert len(Keyword) == 10, "Not all keyword types were handled while parsing macro body"
+                        if ntoken.value in [Keyword.IF, Keyword.WHILE, Keyword.MACRO, Keyword.MEMORY]:
                             nesting_depth += 1
                         elif ntoken.value == Keyword.END:
                             nesting_depth -= 1
