@@ -477,7 +477,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
         elif op.typ == OpType.PUSH_MEM:
             fprintf(stream, f"    push(mem+{op.operand});")
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 25, "Not all intrinsics were handled in generate_c_linux_x86_64()"
+            assert len(Intrinsic) == 26, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t a = pop();")
@@ -613,6 +613,12 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "        int64_t a = pop();")
                 fprintf(stream, "        int64_t b = pop();")
                 fprintf(stream, "        *((int64_t*) b) = a;")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.LT:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push((int64_t) a < b);")
                 fprintf(stream, "    }")
             else:
                 raise Exception('Unreachable')
