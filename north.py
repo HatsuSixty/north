@@ -167,6 +167,14 @@ class Intrinsic(Enum):
     SYSCALL4=auto()
     SYSCALL5=auto()
     SYSCALL6=auto()
+    LOAD8=auto()
+    LOAD16=auto()
+    LOAD32=auto()
+    LOAD64=auto()
+    STORE8=auto()
+    STORE16=auto()
+    STORE32=auto()
+    STORE64=auto()
 
 @dataclass
 class CallOperand:
@@ -260,7 +268,7 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
             fprintf(stream, "test rax, rax")
             fprintf(stream, "jz addr_%d" % op.operand)
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
+            assert len(Intrinsic) == 25, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
@@ -361,6 +369,32 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "pop r9")
                 fprintf(stream, "syscall")
                 fprintf(stream, "push rax")
+            elif op.operand == Intrinsic.LOAD8:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "xor rbx, rbx")
+                fprintf(stream, "mov bl, [rax]")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.LOAD16:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.LOAD32:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.LOAD64:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "xor rbx, rbx")
+                fprintf(stream, "mov rbx, [rax]")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.STORE8:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "mov [rbx], al")
+            elif op.operand == Intrinsic.STORE16:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.STORE32:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.STORE64:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "mov [rbx], rax")
             else:
                 raise Exception('Unreachable')
         elif op.typ in [OpType.CALL0,
@@ -434,7 +468,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
         elif op.typ == OpType.PUSH_MEM:
             fprintf(stream, f"    push(mem+{op.operand});")
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 17, "Not all intrinsics were handled in generate_c_linux_x86_64()"
+            assert len(Intrinsic) == 25, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t a = pop();")
@@ -540,6 +574,36 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "        int64_t e = pop();")
                 fprintf(stream, "        int64_t f = pop();")
                 fprintf(stream, "        push(syscall(sys, a, b, c, d, e, f));")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.LOAD8:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(*((char*) a));")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.LOAD16:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.LOAD32:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.LOAD64:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(*((int64_t*) a));")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.STORE8:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        *((char*) b) = (char) a;")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.STORE16:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.STORE32:
+                raise NotImplementedError
+            elif op.operand == Intrinsic.STORE64:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        *((int64_t*) b) = a;")
                 fprintf(stream, "    }")
             else:
                 raise Exception('Unreachable')
@@ -660,7 +724,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
 HOME = getenv("HOME")
 INCLUDE_SEARCH_PATHS: List[str] = ["./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
 
-assert len(Intrinsic) == 17, "Not all intrinsics were handled in INTRINSICS_TABLE"
+assert len(Intrinsic) == 25, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'print': Intrinsic.PRINT,
     '+': Intrinsic.PLUS,
@@ -679,6 +743,14 @@ INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'syscall4': Intrinsic.SYSCALL4,
     'syscall5': Intrinsic.SYSCALL5,
     'syscall6': Intrinsic.SYSCALL6,
+    '!8': Intrinsic.STORE8,
+    '!16': Intrinsic.STORE16,
+    '!32': Intrinsic.STORE32,
+    '!64': Intrinsic.STORE64,
+    '@8': Intrinsic.LOAD8,
+    '@16': Intrinsic.LOAD16,
+    '@32': Intrinsic.LOAD32,
+    '@64': Intrinsic.LOAD64,
 }
 
 @dataclass
