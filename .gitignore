@@ -1,4 +1,6 @@
 *.o
+*.asm
+*.c
 foo*
 bar*
 baz*
