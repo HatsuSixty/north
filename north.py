@@ -508,7 +508,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
         elif op.typ == OpType.PUSH_MEM:
             fprintf(stream, f"    push(mem+{op.operand});")
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 26, "Not all intrinsics were handled in generate_c_linux_x86_64()"
+            assert len(Intrinsic) == 31, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t a = pop();")
@@ -650,6 +650,38 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "        int64_t b = pop();")
                 fprintf(stream, "        int64_t a = pop();")
                 fprintf(stream, "        push((int64_t) a < b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.SHL:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(a << b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.SHR:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(a >> b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.AND:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(a & b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.OR:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        push(a | b);")
+                fprintf(stream, "    }")
+            elif op.operand == Intrinsic.OVER:
+                fprintf(stream, "    {")
+                fprintf(stream, "        int64_t a = pop();")
+                fprintf(stream, "        int64_t b = pop();")
+                fprintf(stream, "        push(b);")
+                fprintf(stream, "        push(a);")
+                fprintf(stream, "        push(b);")
                 fprintf(stream, "    }")
             else:
                 raise Exception('Unreachable')
