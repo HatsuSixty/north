@@ -152,6 +152,10 @@ class OpType(Enum):
 class Intrinsic(Enum):
     PLUS=auto()
     MINUS=auto()
+    SHL=auto()
+    SHR=auto()
+    OR=auto()
+    AND=auto()
     EQUAL=auto()
     NEQUAL=auto()
     PRINT=auto()
@@ -160,6 +164,7 @@ class Intrinsic(Enum):
     DIVMOD=auto()
     SWAP=auto()
     DROP=auto()
+    OVER=auto()
     SYSCALL0=auto()
     SYSCALL1=auto()
     SYSCALL2=auto()
@@ -269,7 +274,7 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
             fprintf(stream, "test rax, rax")
             fprintf(stream, "jz addr_%d" % op.operand)
         elif op.typ == OpType.INTRINSIC:
-            assert len(Intrinsic) == 26, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
+            assert len(Intrinsic) == 31, "Not all intrinsics were handled in generate_nasm_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
                 fprintf(stream, "pop rax")
                 fprintf(stream, "pop rbx")
@@ -404,6 +409,32 @@ def generate_nasm_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "cmp rax, rbx")
                 fprintf(stream, "cmovl rcx, rdx")
                 fprintf(stream, "push rcx")
+            elif op.operand == Intrinsic.SHL:
+                fprintf(stream, "pop rcx")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "shl rbx, cl")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.SHR:
+                fprintf(stream, "pop rcx")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "shr rbx, cl")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.AND:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "and rbx, rax")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.OR:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "or rbx, rax")
+                fprintf(stream, "push rbx")
+            elif op.operand == Intrinsic.OVER:
+                fprintf(stream, "pop rax")
+                fprintf(stream, "pop rbx")
+                fprintf(stream, "push rbx")
+                fprintf(stream, "push rax")
+                fprintf(stream, "push rbx")
             else:
                 raise Exception('Unreachable')
         elif op.typ in [OpType.CALL0,
@@ -739,11 +770,15 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
 HOME = getenv("HOME")
 INCLUDE_SEARCH_PATHS: List[str] = ["./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
 
-assert len(Intrinsic) == 26, "Not all intrinsics were handled in INTRINSICS_TABLE"
+assert len(Intrinsic) == 31, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'print': Intrinsic.PRINT,
     '+': Intrinsic.PLUS,
     '-': Intrinsic.MINUS,
+    '<<': Intrinsic.SHL,
+    '>>': Intrinsic.SHR,
+    '|': Intrinsic.OR,
+    '&': Intrinsic.AND,
     '=': Intrinsic.EQUAL,
     '!=': Intrinsic.NEQUAL,
     'divmod': Intrinsic.DIVMOD,
@@ -751,6 +786,7 @@ INTRINSICS_TABLE: Dict[str, Intrinsic] = {
     'dup': Intrinsic.DUP,
     'swap': Intrinsic.SWAP,
     'drop': Intrinsic.DROP,
+    'over': Intrinsic.OVER,
     'syscall0': Intrinsic.SYSCALL0,
     'syscall1': Intrinsic.SYSCALL1,
     'syscall2': Intrinsic.SYSCALL2,
