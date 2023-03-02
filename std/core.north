@@ -1,0 +1,6 @@
+; Core instructions used in North
+macro % divmod swap drop end
+macro / divmod      drop end
+
+macro true  1 end
+macro false 0 end
