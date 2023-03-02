@@ -547,8 +547,8 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
                 fprintf(stream, "    {")
                 fprintf(stream, "        int64_t a = pop();")
                 fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(a / b);")
-                fprintf(stream, "        push(a % b);")
+                fprintf(stream, "        push(b / a);")
+                fprintf(stream, "        push(b % a);")
                 fprintf(stream, "    }")
             elif op.operand == Intrinsic.SWAP:
                 fprintf(stream, "    {")
