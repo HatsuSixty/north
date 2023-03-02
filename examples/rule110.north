@@ -1,0 +1,38 @@
+include "io.north"
+
+macro N 100 end
+
+memory row           N end
+memory display   N 1 + end
+
+row N 2 - + 1 !8
+display N + 10 !8
+
+0 while dup N 2 - < do
+  0 while dup N < do
+    dup row + @8 1 = if
+      dup display + 42 !8
+    else
+      dup display + 32 !8
+    end
+    1 +
+  end drop
+
+  N 1 + display puts
+
+  row     @8 1 <<
+  row 1 + @8
+  |
+
+  1 while dup N 2 - < do
+    swap 1 << 7 &
+    over row + 1 + @8 |
+    over over 110 swap >> 1 &
+    swap row + swap !8
+    swap
+
+    1 +
+  end drop drop
+
+  1 +
+end drop
