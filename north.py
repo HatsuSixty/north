@@ -800,7 +800,7 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
 ####### PARSER
 
 HOME = getenv("HOME")
-INCLUDE_SEARCH_PATHS: List[str] = ["./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
+INCLUDE_SEARCH_PATHS: List[str] = ["../", "../std/", "./", "./std/", f"{HOME}/.local/include/north/", "/usr/local/include/north/"]
 
 assert len(Intrinsic) == 31, "Not all intrinsics were handled in INTRINSICS_TABLE"
 INTRINSICS_TABLE: Dict[str, Intrinsic] = {
