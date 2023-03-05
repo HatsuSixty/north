@@ -1219,7 +1219,7 @@ if __name__ == '__main__':
             file.close()
 
             disabled_warnings = ["-Wno-int-conversion"]
-            run_cmd_with_log(["gcc", "-std=gnu17"] + disabled_warnings + ["-o", basefilename, output])
+            run_cmd_with_log(["gcc", "-std=gnu17", "-O3"] + disabled_warnings + ["-o", basefilename, output])
         else:
             compiler_error_info(f"unknown compilation target: `{target}`")
             usage(stderr, myname)
