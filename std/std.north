@@ -1,0 +1,11 @@
+; Standard functions
+
+macro cstrlen
+  dup
+  while dup @8 0 != do 1 + end
+  swap -
+end
+
+macro cstr-to-str
+  dup cstrlen swap
+end
