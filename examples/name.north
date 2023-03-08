@@ -1,0 +1,16 @@
+include "io.north"
+include "std.north"
+
+macro NAME_CAPACITY 256 end
+
+memory name NAME_CAPACITY end
+
+"What's your name? " puts
+NAME_CAPACITY name gets
+
+name dup cstrlen + 1 - 0 !8
+
+"Hello " puts
+name cstr-to-str puts
+
+"! ( ^-^)/\n" puts
