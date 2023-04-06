@@ -4,14 +4,20 @@ from copy import copy
 from dataclasses import dataclass
 from enum import Enum, auto
 from os import getcwd, getenv
-from os.path import splitext, isfile
+from os.path import join as pjoin, isfile, splitext
 from typing import *
-from shlex import join
+from shlex import join as sjoin
 from subprocess import call
 from sys import argv, stdout, stderr
 
 def fprintf(stream: IO, *args, **kwargs):
     print(*args, file=stream, **kwargs)
+
+def available_in_path(exe: str) -> bool:
+    for p in getenv("PATH").split(":"):
+        if isfile(pjoin(p, exe)):
+            return True
+    return False
 
 def compiler_base_info(title: str, info: str, stream: IO):
     print(f"[{title.upper()}] {info}", file=stream)
@@ -22,8 +28,11 @@ def compiler_info(title: str, info: str):
 def compiler_error_info(info: str):
     compiler_base_info("error", info, stderr)
 
+def compiler_warning_info(info: str):
+    compiler_base_info("warning", info, stderr)
+
 def run_cmd_with_log(cmd: List[str]):
-    compiler_info("cmd", join(cmd))
+    compiler_info("cmd", sjoin(cmd))
     call(cmd, cwd=getcwd())
 
 ####### LEXER
@@ -497,302 +506,302 @@ def generate_c_linux_x86_64(program: Program, memory_size: int, stream: IO):
             comment += f" {str(op.operand)}"
         fprintf(stream, f"    // -- {comment} --")
         if op.typ == OpType.PUSH_INT:
-            fprintf(stream, f"    push({op.operand});")
+            fprintf(stream, f"push({op.operand});")
         elif op.typ == OpType.PUSH_STR:
             assert isinstance(op.operand, str), "This could be a bug in the parser"
-            fprintf(stream, f"    push({len(op.operand)});")
-            stream.write("    push((int64_t) ")
+            fprintf(stream, f"push({len(op.operand)});")
+            stream.write("push((int64_t) ")
             for c in op.operand:
                 stream.write("\"\\x%x\"" % ord(c))
             stream.write(");\n")
         elif op.typ == OpType.PUSH_MEM:
-            fprintf(stream, f"    push(mem+{op.operand});")
+            fprintf(stream, f"push(mem+{op.operand});")
         elif op.typ == OpType.INTRINSIC:
             assert len(Intrinsic) == 31, "Not all intrinsics were handled in generate_c_linux_x86_64()"
             if op.operand == Intrinsic.PLUS:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(a + b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(a + b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.MINUS:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(b - a);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(b - a);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.EQUAL:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(a == b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(a == b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.NEQUAL:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(a != b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(a != b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.PRINT:
-                fprintf(stream, "    printf(\"%ld\\n\", pop());")
+                fprintf(stream, "printf(\"%ld\\n\", pop());")
             elif op.operand == Intrinsic.EXIT:
-                fprintf(stream, "    exit(pop());")
+                fprintf(stream, "exit(pop());")
             elif op.operand == Intrinsic.DUP:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(a);")
-                fprintf(stream, "        push(a);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(a);")
+                fprintf(stream, "push(a);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.DIVMOD:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(b / a);")
-                fprintf(stream, "        push(b % a);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(b / a);")
+                fprintf(stream, "push(b % a);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SWAP:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(a);")
-                fprintf(stream, "        push(b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(a);")
+                fprintf(stream, "push(b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.DROP:
-                fprintf(stream, "    pop();")
+                fprintf(stream, "pop();")
             elif op.operand == Intrinsic.SYSCALL0:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        push(syscall(sys));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "push(syscall(sys));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL1:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(syscall(sys, a));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(syscall(sys, a));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL2:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(syscall(sys, a, b));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(syscall(sys, a, b));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL3:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t c = pop();")
-                fprintf(stream, "        push(syscall(sys, a, b, c));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t c = pop();")
+                fprintf(stream, "push(syscall(sys, a, b, c));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL4:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t c = pop();")
-                fprintf(stream, "        int64_t d = pop();")
-                fprintf(stream, "        push(syscall(sys, a, b, c, d));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t c = pop();")
+                fprintf(stream, "int64_t d = pop();")
+                fprintf(stream, "push(syscall(sys, a, b, c, d));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL5:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t c = pop();")
-                fprintf(stream, "        int64_t d = pop();")
-                fprintf(stream, "        int64_t e = pop();")
-                fprintf(stream, "        push(syscall(sys, a, b, c, d, e));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t c = pop();")
+                fprintf(stream, "int64_t d = pop();")
+                fprintf(stream, "int64_t e = pop();")
+                fprintf(stream, "push(syscall(sys, a, b, c, d, e));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SYSCALL6:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t sys = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t c = pop();")
-                fprintf(stream, "        int64_t d = pop();")
-                fprintf(stream, "        int64_t e = pop();")
-                fprintf(stream, "        int64_t f = pop();")
-                fprintf(stream, "        push(syscall(sys, a, b, c, d, e, f));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t sys = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t c = pop();")
+                fprintf(stream, "int64_t d = pop();")
+                fprintf(stream, "int64_t e = pop();")
+                fprintf(stream, "int64_t f = pop();")
+                fprintf(stream, "push(syscall(sys, a, b, c, d, e, f));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.LOAD8:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(*((char*) a));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(*((char*) a));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.LOAD16:
                 raise NotImplementedError
             elif op.operand == Intrinsic.LOAD32:
                 raise NotImplementedError
             elif op.operand == Intrinsic.LOAD64:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(*((int64_t*) a));")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(*((int64_t*) a));")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.STORE8:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        *((char*) b) = (char) a;")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "*((char*) b) = (char) a;")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.STORE16:
                 raise NotImplementedError
             elif op.operand == Intrinsic.STORE32:
                 raise NotImplementedError
             elif op.operand == Intrinsic.STORE64:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        *((int64_t*) b) = a;")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "*((int64_t*) b) = a;")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.LT:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push((int64_t) a < b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push((int64_t) a < b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SHL:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(a << b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(a << b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.SHR:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(a >> b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(a >> b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.AND:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(a & b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(a & b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.OR:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        push(a | b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "push(a | b);")
+                fprintf(stream, "}")
             elif op.operand == Intrinsic.OVER:
-                fprintf(stream, "    {")
-                fprintf(stream, "        int64_t a = pop();")
-                fprintf(stream, "        int64_t b = pop();")
-                fprintf(stream, "        push(b);")
-                fprintf(stream, "        push(a);")
-                fprintf(stream, "        push(b);")
-                fprintf(stream, "    }")
+                fprintf(stream, "{")
+                fprintf(stream, "int64_t a = pop();")
+                fprintf(stream, "int64_t b = pop();")
+                fprintf(stream, "push(b);")
+                fprintf(stream, "push(a);")
+                fprintf(stream, "push(b);")
+                fprintf(stream, "}")
             else:
                 raise Exception('Unreachable')
         elif op.typ == OpType.IF:
-            fprintf(stream, "    if (pop()) {")
+            fprintf(stream, "if (pop()) {")
         elif op.typ == OpType.ELSE:
-            fprintf(stream, "    } else {")
+            fprintf(stream, "} else {")
         elif op.typ == OpType.WHILE:
             while_stack.append(condition_number)
-            fprintf(stream, "    bool condition_%d() {" % condition_number)
+            fprintf(stream, "bool condition_%d() {" % condition_number)
             condition_number += 1
         elif op.typ == OpType.DO:
-            fprintf(stream, "        return (bool) pop();")
-            fprintf(stream, "    }")
+            fprintf(stream, "return (bool) pop();")
+            fprintf(stream, "}")
             assert len(while_stack) > 0
-            fprintf(stream, "    while (condition_%d()) {" % while_stack.pop())
+            fprintf(stream, "while (condition_%d()) {" % while_stack.pop())
         elif op.typ == OpType.END:
-            fprintf(stream, "    }")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL0:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
+            fprintf(stream, "{")
             if returns:
-                fprintf(stream, f"        push({func_name}());")
+                fprintf(stream, f"push({func_name}());")
             else:
-                fprintf(stream, f"        {func_name}();")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}();")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL1:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a));")
+                fprintf(stream, f"push({func_name}(a));")
             else:
-                fprintf(stream, f"        {func_name}(a);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL2:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, "        int64_t b = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
+            fprintf(stream, "int64_t b = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a, b));")
+                fprintf(stream, f"push({func_name}(a, b));")
             else:
-                fprintf(stream, f"        {func_name}(a, b);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a, b);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL3:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, "        int64_t b = pop();")
-            fprintf(stream, "        int64_t c = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
+            fprintf(stream, "int64_t b = pop();")
+            fprintf(stream, "int64_t c = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a, b, c));")
+                fprintf(stream, f"push({func_name}(a, b, c));")
             else:
-                fprintf(stream, f"        {func_name}(a, b, c);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a, b, c);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL4:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, "        int64_t b = pop();")
-            fprintf(stream, "        int64_t c = pop();")
-            fprintf(stream, "        int64_t d = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
+            fprintf(stream, "int64_t b = pop();")
+            fprintf(stream, "int64_t c = pop();")
+            fprintf(stream, "int64_t d = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a, b, c, d));")
+                fprintf(stream, f"push({func_name}(a, b, c, d));")
             else:
-                fprintf(stream, f"        {func_name}(a, b, c, d);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a, b, c, d);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL5:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, "        int64_t b = pop();")
-            fprintf(stream, "        int64_t c = pop();")
-            fprintf(stream, "        int64_t d = pop();")
-            fprintf(stream, "        int64_t e = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
+            fprintf(stream, "int64_t b = pop();")
+            fprintf(stream, "int64_t c = pop();")
+            fprintf(stream, "int64_t d = pop();")
+            fprintf(stream, "int64_t e = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a, b, c, d, e));")
+                fprintf(stream, f"push({func_name}(a, b, c, d, e));")
             else:
-                fprintf(stream, f"        {func_name}(a, b, c, d, e);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a, b, c, d, e);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CALL6:
             assert isinstance(op.operand, CallOperand), "This could be a bug in the parser"
             func_name = op.operand.func
             returns = op.operand.returns
-            fprintf(stream, "    {")
-            fprintf(stream, "        int64_t a = pop();")
-            fprintf(stream, "        int64_t b = pop();")
-            fprintf(stream, "        int64_t c = pop();")
-            fprintf(stream, "        int64_t d = pop();")
-            fprintf(stream, "        int64_t e = pop();")
-            fprintf(stream, "        int64_t f = pop();")
+            fprintf(stream, "{")
+            fprintf(stream, "int64_t a = pop();")
+            fprintf(stream, "int64_t b = pop();")
+            fprintf(stream, "int64_t c = pop();")
+            fprintf(stream, "int64_t d = pop();")
+            fprintf(stream, "int64_t e = pop();")
+            fprintf(stream, "int64_t f = pop();")
             if returns:
-                fprintf(stream, f"        push({func_name}(a, b, c, d, e, f));")
+                fprintf(stream, f"push({func_name}(a, b, c, d, e, f));")
             else:
-                fprintf(stream, f"        {func_name}(a, b, c, d, e, f);")
-            fprintf(stream, "    }")
+                fprintf(stream, f"{func_name}(a, b, c, d, e, f);")
+            fprintf(stream, "}")
         elif op.typ == OpType.CVAR:
-            fprintf(stream, f"    push({op.operand});")
+            fprintf(stream, f"push({op.operand});")
         else:
             raise Exception('Unreachable')
     fprintf(stream, "}")
@@ -1217,6 +1226,15 @@ if __name__ == '__main__':
             compiler_info("info", f"Generating `{output}`")
             generate_c_linux_x86_64(program, mem_size, file)
             file.close()
+
+            if available_in_path("clang-format"):
+                run_cmd_with_log(
+                    ["clang-format",
+                     "--style={BasedOnStyle: Chromium, IndentWidth: 4}",
+                     "-i",
+                     output])
+            else:
+                compiler_warning_info("`clang-format` executable not available, not formatting generated C code")
 
             disabled_warnings = ["-Wno-int-conversion"]
             run_cmd_with_log(["gcc", "-std=gnu17", "-O3"] + disabled_warnings + ["-o", basefilename, output])
